@@ -1,0 +1,471 @@
+=== docs/NeighbourNode.docx ===
+Project Title: NeighbourNode
+Tagline: The Autonomous Hyper-Local Sharing Economy & Marketplace.
+Hackathon Track: Community Track (Supporting Local Housing, Library Systems, Circular Economy).
+1. The Core Problem
+Modern apartment complexes and university dorms are densely packed but socially isolated. Residents constantly buy expensive, single-use items (power drills, hiking tents, soldering irons, specialized textbooks, crutches) while their neighbor three doors down has the exact item sitting unused in a closet.
+Community "Libraries of Things" are great in theory but fail in practice because the logistics—discovering items, awkward negotiations, scheduling handoffs, and the friction of reminding people to return things—are too high.
+2. The Solution
+NeighbourNode is an agentic platform that handles the entire lifecycle of local borrowing and buying. It removes social friction by acting as an autonomous intermediary. You don't ask your neighbor for a drill; you ask the AI, and the AI handles the negotiation, scheduling, and retrieval logistics via seamless WhatsApp integrations.
+If the item isn't available locally, a secondary AI agent acts as a personal shopper, scraping local marketplaces (OLX, Facebook Marketplace, local subreddits) to find the best alternative.
+3. The Multi-Agent Architecture & Workflows (The "Action" Layer)
+To win, the app must demonstrate the AI making decisions and executing actions across different systems. We will use a trio of agents:
+Agent 1: The Matchmaker & Broker (Action: Discovery & Negotiation)
+The User Flow: A user opens the React web app (or simply texts the WhatsApp bot): "I need a Bosch power drill this Saturday morning for a few hours."
+The Action: 1.  The agent queries the hosted SQL database (Supabase) and finds a match in Building B.
+2.  It autonomously triggers a WhatsApp message via Twilio to the owner: "Hi! Your neighbor needs your power drill this Saturday 10 AM - 2 PM. Reply 'APPROVE' to lend it, or suggest another time."
+3.  Upon "APPROVE", the agent generates a Google Calendar invite containing a meeting spot (e.g., "Lobby") and emails both parties.
+4.  It updates the database status to RESERVED.
+Agent 2: The Warden (Action: Lifecycle & Retrieval)
+The User Flow: This agent runs as a background cron job (no user initiation).
+The Action:
+It checks the database every hour. If an item is past its return time, it initiates a WhatsApp workflow with the borrower: "Hi! Your time with the drill is up. Can you return it in the next hour? Reply 'DONE' or 'EXTEND'."
+If 'EXTEND', it brokers the extension with the owner. If 'DONE', it messages the owner to verify receipt.
+It updates the database status back to AVAILABLE.
+Agent 3: The Local Scavenger (Action: RAG & External Discovery)
+The User Flow: A user asks for an item (e.g., "I need a used Arduino kit") and the database has zero matches in the building.
+The Action:
+The Matchmaker agent realizes the query failed locally. It passes the intent to the Scavenger.
+The Scavenger executes a real-time web search (using tools like browser-use or basic scraping APIs) targeting local OLX, Reddit (e.g., r/bangalore), or Facebook Marketplace.
+It formats the best 3 results and presents them to the user: "Nobody in the building has an Arduino, but I found these 3 listings within 5km for under ₹1000. Want me to draft a message to the seller?"
+4. Technical Stack (Highly Feasible for 24-48 Hours)
+Frontend: React (Next.js) or simply a WhatsApp-only interface (highly impressive to judges for its "invisible UI").
+Backend / Orchestration: Node.js or FastAPI. This is where the agents live.
+Database: Supabase (PostgreSQL). Clean, relational data for items, users, and borrowing states.
+AI Engine: Gemini 1.5 Flash (for fast routing/intent detection) and Gemini 1.5 Pro (for complex extraction and scraping).
+Action APIs (Crucial):
+Twilio API: For the two-way WhatsApp broker and warden workflows.
+Google Calendar API: For scheduling handoffs.
+SerpAPI / Firecrawl: For the Scavenger agent to search local marketplaces quickly without building complex custom scrapers.
+5. Why This Wins the Hackathon
+Zero Brittleness: Unlike government scrapers, updating a Supabase row and sending a Twilio text is 100% reliable. Your demo will be flawless.
+Hits the Theme perfectly: It directly addresses "Library systems" and "Community improvement" from the prompt.
+True Agentic Action: The AI isn't just answering questions; it is literally brokering deals between two human beings, scheduling meetings, and acting as a collection agent.
+The "Wow" Demo: Having two judges on stage, where Judge A asks for an item on the web app, and Judge B receives an automated WhatsApp text asking for permission to lend it, is an unbeatable live demonstration of "AI taking action."
+tech stack 
+1. The AI & Orchestration Layer (The "Brains")
+Primary LLMs:
+Gemini 1.5 Flash: Used for lightning-fast intent routing. When a user sends a Telegram message, Flash instantly decides: "Is this a new request, an approval, or just a chat?"
+Gemini 1.5 Pro: Used for the "Scavenger Agent." Its massive context window and reasoning are perfect for synthesizing search results and handling complex negotiations.
+Agent Orchestration: LangGraph (Python) OR Google Agent Development Kit (ADK)
+Why: You need stateful, multi-step workflows. If the AI asks the user, "Do you want to borrow the drill tomorrow at 10 AM?", it needs to remember that context when the user taps the "Yes" button. LangGraph makes this predictable and prevents the AI from hallucinating.
+Search/Scraping Tool: Gemini Native Google Search Tool
+Why: Instead of building custom scrapers, you simply enable the native search tool in your Gemini API call. The Scavenger Agent can autonomously search local Indian marketplaces/Reddit to find items not available in the building.
+2. The Backend & Webhook Layer (The "Engine")
+Framework: FastAPI (Python)
+Why: Python is the native language of AI. FastAPI is incredibly fast, handles asynchronous requests perfectly (crucial for waiting on LLM responses), and makes setting up Telegram webhooks a breeze.
+Background Tasks (The Warden Agent): APScheduler (Python)
+Why: You need the Warden Agent to wake up every hour, check the database for overdue items, and send Telegram messages without a user prompting it. APScheduler integrates cleanly into FastAPI.
+Local Webhook Testing: Ngrok
+Why: Telegram needs a public URL to send messages to. Ngrok exposes your local laptop port to the internet so you can test the bot live without deploying your code every 5 minutes.
+3. The Database (The "Ledger")
+Platform: Supabase (PostgreSQL)
+Why: It gives you a production-ready SQL database in 60 seconds with zero DevOps. You need relational tables to link Users -> Items -> Borrowing_Transactions.
+Bonus: It has built-in Row Level Security and an instant REST API if your frontend wants to fetch data directly without hitting your Python backend.
+4. The Frontend (The "Catalog")
+Framework: Next.js (React) or Vite + React
+Why: Build a mobile-responsive website. Users browse items here, but all notifications and actions happen on Telegram.
+UI Components: Tailwind CSS + Shadcn/ui (or Aceternity UI)
+Why: Don't waste hackathon hours writing CSS. Shadcn allows you to copy-paste premium, animated components (like sleek item cards, dashboards, and dialog boxes). It makes your MVP look like a Series-A startup.
+Mapping: React-Leaflet
+Why: To show a cool, interactive map of the apartment complex/neighborhood with pins indicating where available items are located.
+5. The Action APIs (The "Hands")
+Messaging & UI: Telegram Bot API
+Why: Instant setup via BotFather (no business verification needed).
+Killer Feature: Inline Keyboards. Instead of asking users to type replies, your bot sends buttons (e.g., [ ✅ Approve ], [ 📅 Suggest Time ]). Clicking these sends a silent JSON payload to your FastAPI server, ensuring zero typos and a flawless demo.
+Scheduling: Google Calendar API
+Why: When a user hits [ ✅ Approve ] on Telegram, the Agent uses this API to generate a calendar invite (e.g., "Handoff: Power Drill @ Tower A Lobby") and emails it to both neighbors.
+6. Deployment (Getting it Live)
+Backend Hosting: Render or Google Cloud Run (Connect your GitHub repo, and it auto-deploys your FastAPI server).
+Frontend Hosting: Vercel (Deploying Next.js/React takes 2 minutes).
+help me to define proper project structure and also give me how should we divide the work so that there is no issue in final integration and we can work independently
+Use a monorepo.
+neighbournode/
+│
+├── apps/
+│   ├── frontend/                 # Next.js app
+│   ├── backend/                  # FastAPI app
+│   └── telegram-bot/             # Telegram webhook handlers
+│
+├── packages/
+│   ├── shared-types/             # Shared schemas/contracts
+│   ├── prompts/                  # AI prompts
+│   └── config/                   # Shared constants/env schema
+│
+├── docs/
+│   ├── ARCHITECTURE.md
+│   ├── API_CONTRACTS.md
+│   ├── DATABASE_SCHEMA.md
+│   ├── AGENT_FLOW.md
+│   ├── TASK_BOARD.md
+│   └── DEMO_SCRIPT.md
+│
+├── infra/
+│   ├── supabase/
+│   ├── sql/
+│   └── docker/
+│
+└── README.md
+BACKEND STRUCTURE (VERY IMPORTANT)
+backend/
+│
+├── app/
+│   ├── api/
+│   │   ├── routes/
+│   │   │   ├── items.py
+│   │   │   ├── borrow.py
+│   │   │   ├── users.py
+│   │   │   ├── telegram.py
+│   │   │   └── scavenger.py
+│   │   │
+│   │   └── dependencies.py
+│   │
+│   ├── agents/
+│   │   ├── matchmaker/
+│   │   ├── scavenger/
+│   │   ├── warden/
+│   │   └── orchestrator.py
+│   │
+│   ├── services/
+│   │   ├── telegram_service.py
+│   │   ├── calendar_service.py
+│   │   ├── search_service.py
+│   │   ├── supabase_service.py
+│   │   └── notification_service.py
+│   │
+│   ├── schemas/
+│   │   ├── item.py
+│   │   ├── transaction.py
+│   │   ├── telegram.py
+│   │   ├── agent.py
+│   │   └── api.py
+│   │
+│   ├── core/
+│   │   ├── config.py
+│   │   ├── prompts/
+│   │   └── constants.py
+│   │
+│   ├── jobs/
+│   │   └── overdue_checker.py
+│   │
+│   └── main.py
+│
+├── tests/
+└── requirements.txt
+This structure is VERY important because:
+routes are isolated
+agents are isolated
+services are isolated
+schemas become integration contracts
+Create STRICT Shared Schemas
+Example:
+class BorrowRequest(BaseModel):
+    item_name: str
+    borrower_id: str
+    requested_start: datetime
+    requested_end: datetime
+and:
+class MatchResult(BaseModel):
+    success: bool
+    owner_id: str | None
+    item_id: str | None
+    proposed_time: str | None
+EVERYTHING must use these:
+frontend
+agents
+Telegram bot
+APIs
+This eliminates:
+AI hallucinated JSON
+mismatched field names
+integration chaos
+PERFECT TEAM DIVISION
+MEMBER 1 — AI & ORCHESTRATION OWNER
+Owns:
+agents/
+prompts/
+orchestrator.py
+Responsibilities:
+LangGraph
+Gemini integration
+intent routing
+agent state
+scavenger logic
+DOES NOT TOUCH:
+frontend
+Telegram infra
+UI
+Deliverables:
+working agent pipelines
+deterministic outputs
+MEMBER 2 — TELEGRAM & ACTION OWNER
+Owns:
+telegram/
+services/telegram_service.py
+calendar_service.py
+jobs/
+Responsibilities:
+Telegram bot
+inline buttons
+webhook handling
+APScheduler
+Google Calendar integration
+This person owns:
+ALL external actions
+MEMBER 3 — DATABASE & API OWNER
+Owns:
+schemas/
+routes/
+supabase/
+Responsibilities:
+DB schema
+Supabase
+CRUD APIs
+auth
+transactions
+state persistence
+MOST IMPORTANT ROLE FOR STABILITY.
+Nobody edits schema except this person.
+MEMBER 4 — FRONTEND & DEMO OWNER
+Owns:
+frontend/
+Responsibilities:
+item catalog
+dashboard
+map
+animations
+UX polish
+demo flow
+PPT visuals
+This person also:
+prepares judge demo
+handles storytelling
+ABSOLUTE RULES TO PREVENT INTEGRATION ISSUES
+RULE 1
+Nobody edits another person’s domain casually.
+Instead:
+create issue
+PR
+discuss interface
+RULE 2
+Database schema freezes EARLY
+This is the #1 integration killer.
+After initial agreement:
+DO NOT randomly change:
+column names
+response formats
+transaction states
+RULE 3
+Shared State Enum
+Create:
+class TransactionStatus(str, Enum):
+    AVAILABLE = "available"
+    PENDING = "pending"
+    RESERVED = "reserved"
+    OVERDUE = "overdue"
+    RETURNED = "returned"
+EVERYTHING uses this.
+This prevents:
+inconsistent logic
+AI-generated random strings
+RULE 4
+Merge Every Few Hours
+Never:
+“we’ll integrate tomorrow”
+That is how hackathon teams die.
+RULE 5
+Protect the Demo Path
+Your golden path is:
+Request item
+→ Match found
+→ Telegram approval
+→ Calendar invite
+→ Reservation complete
+This MUST always work.
+Even if:
+scavenger broken
+map broken
+fancy UI broken
+THE BEST DEVELOPMENT ORDER
+This is CRITICAL.
+PHASE 1 — FOUNDATION (2–3 HOURS)
+ALL MEMBERS TOGETHER
+Build:
+repo
+folder structure
+Supabase schema
+shared models
+API contracts
+ONLY THIS.
+No feature coding yet.
+PHASE 2 — CORE DEMO PIPELINE
+Priority order:
+1.
+Database + Items
+2.
+Telegram approve flow
+3.
+Reservation state updates
+4.
+Calendar invite
+5.
+Frontend visualization
+Once this works:
+YOU ALREADY HAVE A WINNING DEMO.
+PHASE 3 — AGENTIC LAYER
+Now add:
+scavenger
+Gemini reasoning
+smart negotiation
+overdue reminders
+These are enhancers.
+NOT core dependencies.
+=== docs/NeighbourNode_DB_Schema.docx ===
+NeighbourNode: Database Architecture & Backend Specifications
+Owner:
+ Member 3 (Database & API Owner) 
+Database:
+ Supabase (PostgreSQL) 
+Backend Framework:
+ FastAPI (Python)
+1. The Core Schema (Data Definition)
+The database is heavily normalized to prevent state mismatch and ensure the AI agents always act on accurate data. All tables are created in Supabase.
+1.1 The Shared State Enum
+To prevent the AI from generating random status strings, all application states are restricted to a strict Postgres enum.
+SQL
+CREATE TYPE transaction_status AS ENUM (
+    'available',
+    'pending',
+    'reserved',
+    'overdue',
+    'returned'
+);
+1.2 Users Table
+Acts as the central identity provider, linking Supabase Auth to Telegram routing.
+SQL
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), 
+    full_name VARCHAR(255) NOT NULL,
+    telegram_chat_id VARCHAR(255) UNIQUE NOT NULL, 
+    building_identifier VARCHAR(100) NOT NULL, 
+    rating DECIMAL(3, 2) DEFAULT 5.00, 
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Index for fast sorting by the Matchmaker
+CREATE INDEX idx_users_rating ON users(rating DESC);
+1.3 Items Table (The Catalog)
+The inventory that users browse on the Next.js frontend.
+SQL
+CREATE TABLE items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    current_status transaction_status DEFAULT 'available', 
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Index for fast frontend filtering
+CREATE INDEX idx_items_status ON items(current_status);
+1.4 Transactions Table (The Ledger)
+Manages the lifecycle of a borrow request and serves as the trigger source for the Warden Agent's background jobs.
+SQL
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    item_id UUID NOT NULL REFERENCES items(id) ON DELETE RESTRICT,
+    borrower_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    status transaction_status DEFAULT 'pending', 
+    requested_start TIMESTAMP WITH TIME ZONE NOT NULL,
+    requested_end TIMESTAMP WITH TIME ZONE NOT NULL, 
+    actual_return TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+-- Index to help APScheduler instantly find overdue items
+CREATE INDEX idx_transactions_warden ON transactions(status, requested_end);
+2. API Contracts (Shared Schemas)
+To eliminate AI-hallucinated JSON and mismatched field names, all FastAPI routes and agent functions must use these Pydantic models.
+Python
+from pydantic import BaseModel
+from datetime import datetime
+from enum import Enum
+from typing import Optional
+class TransactionStatus(str, Enum):
+    AVAILABLE = "available"
+    PENDING = "pending"
+    RESERVED = "reserved"
+    OVERDUE = "overdue"
+    RETURNED = "returned"
+class BorrowRequest(BaseModel):
+    item_name: str
+    borrower_id: str
+    requested_start: datetime
+    requested_end: datetime
+class MatchResult(BaseModel):
+    success: bool
+    owner_id: Optional[str] = None
+    item_id: Optional[str] = None
+    proposed_time: Optional[str] = None
+3. Backend Synchronization Logic (The Service Layer)
+To protect the golden demo path, database state changes are handled centrally in the FastAPI backend rather than relying on complex SQL triggers. This ensures failure states are logged in Python.
+When the Telegram webhook receives an "APPROVE" payload, it must call the 
+SupabaseService
+ to synchronize both the 
+transactions
+ table and the 
+items
+ table simultaneously.
+backend/app/services/supabase_service.py
+Python
+class SupabaseService:
+    def __init__(self, db_client):
+        self.db = db_client
+    async def approve_transaction(self, transaction_id: str, item_id: str) -> dict:
+        """
+        Called when a user taps [ ✅ Approve ] on Telegram.
+        Updates BOTH the transaction ledger and the item catalog to prevent double-booking.
+        """
+        # 1. Update the Transaction Ledger
+        tx_response = self.db.table("transactions").update({
+            "status": TransactionStatus.RESERVED.value
+        }).eq("id", transaction_id).execute()
+        if not tx_response.data:
+            raise ValueError("Transaction update failed.")
+        # 2. Update the Item Catalog
+        item_response = self.db.table("items").update({
+            "current_status": TransactionStatus.RESERVED.value
+        }).eq("id", item_id).execute()
+        if not item_response.data:
+            raise ValueError("Item status update failed.")
+        return {"success": True, "message": "Transaction and Item marked RESERVED."}
+4. Core Agent Database Interactions
+Your API routes must expose these precise queries for the LangGraph agents to consume.
+The Matchmaker Agent Query (Discovery)
+When a user requests an item, this query finds available matches in their specific building, sorted by the neighbor's reliability rating.
+SQL
+SELECT 
+    i.id AS item_id, 
+    i.title, 
+    u.id AS owner_id, 
+    u.telegram_chat_id, 
+    u.rating
+FROM items i
+JOIN users u ON i.owner_id = u.id
+WHERE 
+    i.title ILIKE '%[Extracted_Intent]%' 
+    AND i.current_status = 'available' 
+    AND u.building_identifier = '[User_Building]' 
+ORDER BY 
+    u.rating DESC 
+LIMIT 3;
+The Warden Agent Query (Lifecycle)
+The APScheduler job runs this query every hour to find items that require automated follow-ups.
+SQL
+SELECT 
+    t.id AS transaction_id,
+    t.item_id,
+    t.borrower_id,
+    u.telegram_chat_id AS borrower_chat_id
+FROM transactions t
+JOIN users u ON t.borrower_id = u.id
+WHERE 
+    t.status = 'reserved' 
+    AND t.requested_end < NOW();
