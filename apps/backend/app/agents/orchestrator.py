@@ -7,15 +7,15 @@ from .scavenger.agent import run_scavenger
 
 
 async def run_orchestrator(state: OrchestrationState) -> OrchestrationState:
-	match_result: MatchmakerResult = await run_matchmaker(state)
-	state["match_result"] = match_result
+    match_result: MatchmakerResult = await run_matchmaker(state)
+    state["match_result"] = match_result
 
-	if match_result.get("success"):
-		return state
+    if match_result.get("success"):
+        return state
 
-	scavenger_result: ScavengerResult = await run_scavenger(state)
-	state["scavenger_results"] = scavenger_result.get("results", [])
-	return state
+    scavenger_result: ScavengerResult = await run_scavenger(state)
+    state["scavenger_results"] = scavenger_result.get("results", [])
+    return state
 
 
 async def run_orchestrator_with_adk(
