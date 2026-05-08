@@ -1,0 +1,9 @@
+apscheduler
+fastapi
+google-api-python-client
+google-auth
+google-auth-oauthlib
+pydantic
+python-dotenv
+python-telegram-bot
+uvicorn
