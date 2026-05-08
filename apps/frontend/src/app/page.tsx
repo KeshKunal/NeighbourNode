@@ -1,47 +1,38 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { ItemCard } from "@/components/ItemCard";
 import { BorrowDialog } from "@/components/BorrowDialog";
 import { mockItems, mockUsers } from "@/lib/mockData";
-import { fetchItems } from "@/lib/api";
-import { Item } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Map as MapIcon } from "lucide-react";
+import { motion } from "framer-motion";
 
 // Dynamically import Map with SSR disabled
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
-export default function Home() {
-  const [items, setItems] = useState<Item[]>(mockItems);
-  const [loading, setLoading] = useState(true);
-  const [usingLiveData, setUsingLiveData] = useState(false);
-  const [borrowDialogOpen, setBorrowDialogOpen] = useState(false);
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
 
-  useEffect(() => {
-    fetchItems()
-      .then((data) => {
-        if (data && data.length > 0) {
-          // Map backend items to include display-friendly fields
-          const mapped = data.map((item) => ({
-            ...item,
-            status: item.current_status || item.status || "available",
-            location_lat: item.location_lat ?? 40.7128 + Math.random() * 0.002,
-            location_lng: item.location_lng ?? -74.006 + Math.random() * 0.002,
-          }));
-          setItems(mapped as Item[]);
-          setUsingLiveData(true);
-        }
-      })
-      .catch(() => {
-        // Fallback to mock data silently
-      })
-      .finally(() => setLoading(false));
-  }, []);
+export default function Home() {
+  const [showMap, setShowMap] = useState(true);
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-4rem)]">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-4rem)] overflow-hidden">
       {/* Map Section */}
-      <div className="w-full lg:w-1/2 h-[40vh] lg:h-full relative border-b lg:border-b-0 lg:border-r border-border/40">
+      <div 
+        className={`transition-all duration-500 ease-in-out relative border-b lg:border-b-0 lg:border-r border-border/40
+          ${showMap ? "w-full lg:w-1/2 h-[40vh] lg:h-full opacity-100" : "w-0 h-0 opacity-0 overflow-hidden"}
+        `}
+      >
         <Map />
         {/* Floating Borrow Button */}
         <button
@@ -53,39 +44,52 @@ export default function Home() {
       </div>
 
       {/* Catalog Grid Section */}
-      <div className="w-full lg:w-1/2 h-[60vh] lg:h-full overflow-y-auto bg-background/50">
+      <div 
+        className={`transition-all duration-500 ease-in-out h-full overflow-y-auto bg-background/50
+          ${showMap ? "w-full lg:w-1/2" : "w-full"}
+        `}
+      >
         <div className="p-6">
-          <div className="mb-6 flex items-center justify-between">
+          <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-3xl font-bold tracking-tight">Catalog</h2>
               <p className="text-muted-foreground mt-1">
                 Browse items available to borrow in your neighbourhood.
               </p>
             </div>
-            {usingLiveData && (
-              <span className="text-xs bg-green-500/10 text-green-600 dark:text-green-400 px-3 py-1 rounded-full font-medium">
-                ● Live from Supabase
-              </span>
-            )}
-            {!usingLiveData && !loading && (
-              <span className="text-xs bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 px-3 py-1 rounded-full font-medium">
-                ● Demo Data
-              </span>
-            )}
+            <Button 
+              variant={showMap ? "secondary" : "outline"} 
+              onClick={() => setShowMap(!showMap)}
+              className="hidden lg:flex"
+            >
+              <MapIcon className="w-4 h-4 mr-2" />
+              {showMap ? "Hide Map" : "Show Map"}
+            </Button>
           </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center h-40">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {items.map((item) => {
-                const owner = mockUsers.find((u) => u.id === item.owner_id);
-                return <ItemCard key={item.id} item={item} owner={owner} />;
-              })}
-            </div>
-          )}
+          
+          {/* Mobile toggle button */}
+          <div className="lg:hidden mb-4">
+             <Button 
+              variant={showMap ? "secondary" : "outline"} 
+              onClick={() => setShowMap(!showMap)}
+              className="w-full"
+            >
+              <MapIcon className="w-4 h-4 mr-2" />
+              {showMap ? "Hide Map" : "Show Map"}
+            </Button>
+          </div>
+          
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className={`grid grid-cols-1 gap-6 ${showMap ? "sm:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}
+          >
+            {mockItems.map((item) => {
+              const owner = mockUsers.find((u) => u.id === item.owner_id);
+              return <ItemCard key={item.id} item={item} owner={owner} />;
+            })}
+          </motion.div>
         </div>
       </div>
 

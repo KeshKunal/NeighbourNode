@@ -1,150 +1,138 @@
-"use client";
-
 import React, { useState } from "react";
-import { orchestrateBorrow } from "@/lib/api";
-import { BorrowResponse } from "@/types";
+import { Item } from "@/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { CheckCircle2, Circle, Loader2 } from "lucide-react";
 
 interface BorrowDialogProps {
-  open: boolean;
-  onClose: () => void;
+  item: Item;
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
-export function BorrowDialog({ open, onClose }: BorrowDialogProps) {
-  const [itemName, setItemName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<BorrowResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export function BorrowDialog({ item, isOpen, onOpenChange }: BorrowDialogProps) {
+  // 0: Form, 1: Request sent, 2: AI Negotiating, 3: Waiting Approval, 4: Scheduled
+  const [step, setStep] = useState(0);
 
-  if (!open) return null;
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!itemName.trim()) return;
-
-    setLoading(true);
-    setResult(null);
-    setError(null);
-
-    try {
-      // Use a demo borrower ID — in production this comes from auth
-      const now = new Date();
-      const start = new Date(now.getTime() + 2 * 60 * 60 * 1000); // 2hrs from now
-      const end = new Date(now.getTime() + 6 * 60 * 60 * 1000); // 6hrs from now
-
-      const res = await orchestrateBorrow({
-        item_name: itemName,
-        borrower_id: "demo-borrower-001",
-        requested_start: start.toISOString(),
-        requested_end: end.toISOString(),
-      });
-      setResult(res);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-    } finally {
-      setLoading(false);
+  const handleOpenChange = (open: boolean) => {
+    // Reset state when closing
+    if (!open) {
+      setTimeout(() => setStep(0), 300); // Wait for transition
     }
+    onOpenChange(open);
   };
 
-  const handleClose = () => {
-    setItemName("");
-    setResult(null);
-    setError(null);
-    onClose();
+  const advanceState = () => {
+    setStep((prev) => Math.min(prev + 1, 4));
   };
+
+  const trackerSteps = [
+    { label: "Request sent to AI Matchmaker" },
+    { label: "AI negotiating with owner via Telegram" },
+    { label: "Waiting for owner approval" },
+    { label: "Calendar invite & handover scheduled" },
+  ];
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={handleClose}
-      />
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Request {item.name}</DialogTitle>
+          <DialogDescription>
+            {step === 0
+              ? "Fill out the details below to request this item."
+              : "Track the status of your request in real-time."}
+          </DialogDescription>
+        </DialogHeader>
 
-      {/* Dialog */}
-      <div className="relative bg-card border border-border rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        {/* Header */}
-        <div className="p-6 pb-2">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-bold">🤖 Ask AI to Find an Item</h3>
-            <button
-              onClick={handleClose}
-              className="text-muted-foreground hover:text-foreground transition-colors text-xl"
-            >
-              ✕
-            </button>
-          </div>
-          <p className="text-sm text-muted-foreground mt-1">
-            Describe what you need, and the AI Matchmaker will search your
-            neighbourhood inventory.
-          </p>
-        </div>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 pt-4 space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-1.5 block">
-              What do you need?
-            </label>
-            <input
-              type="text"
-              value={itemName}
-              onChange={(e) => setItemName(e.target.value)}
-              placeholder='e.g., "power drill", "camping tent", "projector"'
-              className="w-full px-4 py-3 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm"
-              disabled={loading}
-              autoFocus
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || !itemName.trim()}
-            className="w-full bg-primary text-primary-foreground py-3 rounded-lg font-semibold transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground" />
-                AI is searching...
-              </>
-            ) : (
-              <>🔍 Search Neighbourhood</>
-            )}
-          </button>
-        </form>
-
-        {/* Result */}
-        {result && (
-          <div className="px-6 pb-6">
-            <div
-              className={`p-4 rounded-lg border ${
-                result.success
-                  ? "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400"
-                  : "bg-yellow-500/10 border-yellow-500/20 text-yellow-700 dark:text-yellow-400"
-              }`}
-            >
-              <p className="font-semibold text-sm">
-                {result.success ? "✅ Match Found!" : "🔎 No Local Match"}
-              </p>
-              <p className="text-sm mt-1 opacity-90">{result.message}</p>
-              {result.transaction_id && (
-                <p className="text-xs mt-2 font-mono opacity-70">
-                  TX: {result.transaction_id}
-                </p>
-              )}
+        {step === 0 ? (
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="date" className="text-sm font-medium leading-none">
+                When do you need this?
+              </label>
+              <Input
+                id="date"
+                type="datetime-local"
+                className="col-span-3"
+              />
             </div>
+            <div className="grid gap-2">
+              <label htmlFor="message" className="text-sm font-medium leading-none">
+                Message to owner (Optional)
+              </label>
+              <Textarea
+                id="message"
+                placeholder="E.g., I just need it for a couple of hours for a DIY project!"
+                className="resize-none"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="py-6 flex flex-col gap-4">
+            {trackerSteps.map((s, index) => {
+              const stepNumber = index + 1;
+              const isActive = step === stepNumber;
+              const isCompleted = step > stepNumber;
+
+              return (
+                <div key={stepNumber} className="flex items-center gap-3">
+                  <div className="flex-shrink-0 flex items-center justify-center w-6 h-6">
+                    {isCompleted ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-500" />
+                    ) : isActive ? (
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    ) : (
+                      <Circle className="w-5 h-5 text-muted-foreground opacity-50" />
+                    )}
+                  </div>
+                  <span
+                    className={`text-sm ${
+                      isActive
+                        ? "font-medium text-foreground"
+                        : isCompleted
+                        ? "text-muted-foreground line-through"
+                        : "text-muted-foreground opacity-70"
+                    }`}
+                  >
+                    {s.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Error */}
-        {error && (
-          <div className="px-6 pb-6">
-            <div className="p-4 rounded-lg border bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400">
-              <p className="font-semibold text-sm">❌ Error</p>
-              <p className="text-sm mt-1 opacity-90">{error}</p>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+        <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
+          {step === 0 ? (
+            <Button type="button" onClick={() => setStep(1)} className="w-full sm:w-auto">
+              Confirm Request
+            </Button>
+          ) : step < 4 ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={advanceState}
+              className="w-full sm:w-auto border-dashed border-primary/50 text-primary/70 hover:text-primary hover:border-primary"
+            >
+              Dev: Advance State
+            </Button>
+          ) : (
+            <Button type="button" onClick={() => handleOpenChange(false)} className="w-full sm:w-auto">
+              Done
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
