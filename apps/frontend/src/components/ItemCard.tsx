@@ -6,16 +6,38 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BorrowDialog } from "@/components/BorrowDialog";
-import { motion } from "framer-motion";
+import { motion, Variants } from "framer-motion";
+import { Image as ImageIcon } from "lucide-react";
 
 interface ItemCardProps {
   item: Item;
   owner?: User;
 }
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
+
+const FallbackImage = ({ src, alt }: { src?: string; alt: string }) => {
+  const [error, setError] = useState(false);
+
+  if (!src || error) {
+    return (
+      <div className="flex items-center justify-center w-full h-full text-muted-foreground bg-muted">
+        <ImageIcon className="w-8 h-8 opacity-50" />
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setError(true)}
+      className="w-full h-full object-cover"
+    />
+  );
 };
 
 export function ItemCard({ item, owner }: ItemCardProps) {
@@ -26,17 +48,7 @@ export function ItemCard({ item, owner }: ItemCardProps) {
     <motion.div variants={itemVariants} whileHover={{ y: -5 }} className="h-full">
       <Card className="flex flex-col overflow-hidden transition-all shadow-sm hover:shadow-md h-full">
         <div className="relative h-48 w-full bg-muted">
-          {item.image_url ? (
-            <img
-              src={item.image_url}
-              alt={item.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="flex items-center justify-center w-full h-full text-muted-foreground">
-              No Image
-            </div>
-          )}
+          <FallbackImage src={item.image_url} alt={item.name} />
           <div className="absolute top-2 right-2">
             <Badge
               variant={isAvailable ? "default" : "secondary"}
