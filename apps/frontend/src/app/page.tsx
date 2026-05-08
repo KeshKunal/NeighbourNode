@@ -6,9 +6,20 @@ import { ItemCard } from "@/components/ItemCard";
 import { mockItems, mockUsers } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Map as MapIcon } from "lucide-react";
+import { motion } from "framer-motion";
 
 // Dynamically import Map with SSR disabled
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
 
 export default function Home() {
   const [showMap, setShowMap] = useState(true);
@@ -60,12 +71,17 @@ export default function Home() {
             </Button>
           </div>
           
-          <div className={`grid grid-cols-1 gap-6 ${showMap ? "sm:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}>
+          <motion.div 
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className={`grid grid-cols-1 gap-6 ${showMap ? "sm:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}
+          >
             {mockItems.map((item) => {
               const owner = mockUsers.find((u) => u.id === item.owner_id);
               return <ItemCard key={item.id} item={item} owner={owner} />;
             })}
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>

@@ -6,19 +6,25 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BorrowDialog } from "@/components/BorrowDialog";
+import { motion } from "framer-motion";
 
 interface ItemCardProps {
   item: Item;
   owner?: User;
 }
 
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+};
+
 export function ItemCard({ item, owner }: ItemCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const isAvailable = item.status === "available";
 
   return (
-    <>
-      <Card className="flex flex-col overflow-hidden transition-all hover:shadow-md h-full">
+    <motion.div variants={itemVariants} whileHover={{ y: -5 }} className="h-full">
+      <Card className="flex flex-col overflow-hidden transition-all shadow-sm hover:shadow-md h-full">
         <div className="relative h-48 w-full bg-muted">
           {item.image_url ? (
             <img
@@ -68,6 +74,6 @@ export function ItemCard({ item, owner }: ItemCardProps) {
         isOpen={isDialogOpen} 
         onOpenChange={setIsDialogOpen} 
       />
-    </>
+    </motion.div>
   );
 }
