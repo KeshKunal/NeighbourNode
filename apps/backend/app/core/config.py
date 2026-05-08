@@ -29,6 +29,10 @@ class Settings:
 	google_credentials_json: dict[str, Any] | None
 	google_credentials_path: str | None
 	mock_external_services: bool
+	# AI / LLM
+	ai_api_base_url: str | None
+	ai_api_key: str | None
+	ai_model: str
 
 
 @lru_cache
@@ -42,4 +46,7 @@ def get_settings() -> Settings:
 		google_credentials_json=credentials_json,
 		google_credentials_path=_get_env("GOOGLE_CREDENTIALS_PATH"),
 		mock_external_services=_get_bool("MOCK_EXTERNAL_SERVICES", default=False),
+		ai_api_base_url=_get_env("AI_API_BASE_URL"),
+		ai_api_key=_get_env("AI_API_KEY"),
+		ai_model=_get_env("AI_MODEL", "google/gemini-3.1-flash-lite"),
 	)

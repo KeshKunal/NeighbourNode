@@ -3,7 +3,9 @@ fastapi
 google-api-python-client
 google-auth
 google-auth-oauthlib
+httpx
 pydantic
 python-dotenv
 python-telegram-bot
+supabase
 uvicorn

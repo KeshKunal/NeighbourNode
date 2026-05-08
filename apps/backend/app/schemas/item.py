@@ -1,7 +1,16 @@
-from pydantic import BaseModel, ConfigDict
+"""
+Item schemas — uses the canonical TransactionStatus from transaction.py.
+Column name is `name` (matches deployed SQL, not the older `title` spec).
+"""
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Optional
+
+from pydantic import BaseModel, ConfigDict
+
 from .transaction import TransactionStatus
+
 
 class ItemBase(BaseModel):
     name: str
@@ -12,8 +21,10 @@ class ItemBase(BaseModel):
     is_active: bool = True
     current_status: TransactionStatus = TransactionStatus.AVAILABLE
 
+
 class ItemCreate(ItemBase):
     owner_id: str
+
 
 class ItemUpdate(BaseModel):
     name: Optional[str] = None
@@ -24,9 +35,10 @@ class ItemUpdate(BaseModel):
     is_active: Optional[bool] = None
     current_status: Optional[TransactionStatus] = None
 
+
 class ItemResponse(ItemBase):
     id: str
     owner_id: str
     created_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)

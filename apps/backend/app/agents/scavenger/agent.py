@@ -1,30 +1,26 @@
+"""
+Scavenger Agent — finds external listings when no local match exists.
+
+Uses the Hack Club AI proxy (OpenAI-compatible) via llm_client.
+"""
 from __future__ import annotations
 
 import json
-import os
+import logging
 from pathlib import Path
 
-from google.adk import Agent
-from google.adk.tools import google_search
+from app.services.llm_client import chat_completion
 
 from ..state import OrchestrationState, ScavengerResult
+
+
+logger = logging.getLogger(__name__)
 
 
 def _load_prompt() -> str:
     repo_root = Path(__file__).resolve().parents[5]
     prompt_path = repo_root / "packages" / "prompts" / "scavenger_prompt.md"
     return prompt_path.read_text(encoding="utf-8")
-
-
-def _build_scavenger_agent() -> Agent:
-    instruction = _load_prompt()
-    model = os.getenv("GEMINI_PRO_MODEL", "gemini-1.5-pro-latest")
-    return Agent(
-        name="LocalScavenger",
-        model=model,
-        instruction=instruction,
-        tools=[google_search],
-    )
 
 
 def _parse_scavenger_response(text: str) -> ScavengerResult:
@@ -38,12 +34,20 @@ def _parse_scavenger_response(text: str) -> ScavengerResult:
 
 
 async def run_scavenger(state: OrchestrationState) -> ScavengerResult:
-    agent = _build_scavenger_agent()
-    prompt = (
+    """Ask the LLM to find external listings for the requested item."""
+    system_prompt = _load_prompt()
+    user_prompt = (
         "Find external listings for the requested item.\n"
         f"item_name: {state['item_name']}\n"
         "location_hint: local neighborhood\n"
         "max_distance_km: 5"
     )
-    response = agent.run(prompt)
-    return _parse_scavenger_response(response.text)
+
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    raw_response = chat_completion(messages)
+    logger.info("scavenger.llm_response", extra={"response": raw_response[:500]})
+    return _parse_scavenger_response(raw_response)

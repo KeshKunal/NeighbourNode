@@ -1,9 +1,20 @@
-from pydantic import BaseModel, ConfigDict
+"""
+Transaction schemas — THE single source of truth for TransactionStatus.
+
+Every service, agent, and route MUST import TransactionStatus from here.
+Values match the Postgres enum in infra/sql/01_initial_schema.sql exactly.
+"""
+from __future__ import annotations
+
 from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from pydantic import BaseModel, ConfigDict
+
+
 class TransactionStatus(str, Enum):
+    """Must mirror the 7-value Postgres enum `transaction_status`."""
     AVAILABLE = "available"
     PENDING_APPROVAL = "pending_approval"
     RESERVED = "reserved"
@@ -11,6 +22,7 @@ class TransactionStatus(str, Enum):
     OVERDUE = "overdue"
     RETURNED = "returned"
     CANCELLED = "cancelled"
+
 
 class TransactionBase(BaseModel):
     item_id: str
@@ -20,35 +32,26 @@ class TransactionBase(BaseModel):
     requested_end: datetime
     status: TransactionStatus = TransactionStatus.PENDING_APPROVAL
 
+
 class TransactionCreate(TransactionBase):
-    pass
+    pickup_spot: Optional[str] = None
+
 
 class TransactionResponse(TransactionBase):
     id: str
     approved_start: Optional[datetime] = None
     approved_end: Optional[datetime] = None
     calendar_event_id: Optional[str] = None
+    pickup_spot: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    
+
     model_config = ConfigDict(from_attributes=True)
-from __future__ import annotations
-
-from enum import Enum
-
-from pydantic import BaseModel
-
-
-class TransactionStatus(str, Enum):
-	AVAILABLE = "available"
-	PENDING = "pending"
-	RESERVED = "reserved"
-	OVERDUE = "overdue"
-	RETURNED = "returned"
 
 
 class TransactionUpdateResult(BaseModel):
-	success: bool
-	message: str
-	transaction_id: str | None = None
-	item_id: str | None = None
+    """Returned by SupabaseService after a status mutation."""
+    success: bool
+    message: str
+    transaction_id: Optional[str] = None
+    item_id: Optional[str] = None
