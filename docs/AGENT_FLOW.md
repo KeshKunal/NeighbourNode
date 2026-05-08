@@ -1,6 +1,6 @@
 # Agent Flow
 
-Agents are orchestrated via LangGraph with deterministic state transitions. All state is typed and stored in shared schemas.
+Agents are orchestrated via Google ADK with deterministic state transitions. All state is typed and stored in shared schemas.
 
 ## Matchmaker (Discovery and Negotiation)
 
@@ -43,7 +43,7 @@ Flow:
 2. Rank results by distance and price.
 3. Return top results with summary.
 
-## Shared LangGraph State
+## Shared Orchestration State
 
 ```
 user_id: str

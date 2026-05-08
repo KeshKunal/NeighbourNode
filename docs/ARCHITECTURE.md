@@ -37,7 +37,7 @@ neighbournode/
 - Matchmaker: local discovery and negotiation
 - Warden: overdue checks and reminders
 - Scavenger: external discovery
-- Orchestrator: LangGraph workflow routing
+- Orchestrator: Google ADK workflow routing
 
 ### Services (apps/backend/app/services)
 

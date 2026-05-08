@@ -6,7 +6,7 @@ You are an expert senior software engineer specializing in:
 
 - FastAPI
 - Python async systems
-- LangGraph agent orchestration
+- Google ADK agent orchestration
 - Telegram Bot development
 - Supabase/PostgreSQL
 - Gemini 1.5 Flash / Gemini 1.5 Pro
@@ -150,7 +150,7 @@ Use:
 
 - Gemini 1.5 Flash
 - Gemini 1.5 Pro
-- LangGraph
+- Google ADK
 
 ### Database
 
@@ -442,11 +442,11 @@ Business rules must remain code-driven.
 
 ---
 
-## 11. LANGGRAPH RULES
+## 11. GOOGLE ADK RULES
 
 ---
 
-Use LangGraph for:
+Use Google ADK for:
 
 - predictable stateful workflows
 - agent orchestration
@@ -458,7 +458,7 @@ Do NOT build:
 - self-improving agents
 - open-ended loops
 
-Preferred graph structure:
+Preferred workflow structure:
 
 ```txt
 Request
@@ -486,7 +486,7 @@ Keep graphs:
 
 ---
 
-All LangGraph state must use TypedDict.
+All orchestration state must use TypedDict.
 
 Example:
 
