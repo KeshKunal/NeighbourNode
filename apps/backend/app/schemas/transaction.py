@@ -32,3 +32,23 @@ class TransactionResponse(TransactionBase):
     updated_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
+from __future__ import annotations
+
+from enum import Enum
+
+from pydantic import BaseModel
+
+
+class TransactionStatus(str, Enum):
+	AVAILABLE = "available"
+	PENDING = "pending"
+	RESERVED = "reserved"
+	OVERDUE = "overdue"
+	RETURNED = "returned"
+
+
+class TransactionUpdateResult(BaseModel):
+	success: bool
+	message: str
+	transaction_id: str | None = None
+	item_id: str | None = None
