@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import os
 from supabase import create_client, Client
 from app.services.supabase_service import SupabaseService
@@ -20,7 +19,6 @@ def get_supabase_client() -> Client:
 def get_supabase_service() -> SupabaseService:
     client = get_supabase_client()
     return SupabaseService(client)
-=======
 from __future__ import annotations
 
 from functools import lru_cache
@@ -50,4 +48,3 @@ def get_notification_service() -> NotificationService:
 @lru_cache
 def get_supabase_service() -> SupabaseService:
 	return SupabaseService()
->>>>>>> 9923707 (Implement Telegram integration with calendar and notification services)

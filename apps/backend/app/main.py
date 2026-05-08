@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from fastapi import FastAPI
 from app.api.routes import items, borrow, users
 
@@ -11,7 +10,6 @@ app.include_router(users.router)
 @app.get("/")
 def read_root():
     return {"message": "NeighbourNode API is running"}
-=======
 from __future__ import annotations
 
 import logging
@@ -45,4 +43,4 @@ async def shutdown() -> None:
 	checker = getattr(app.state, "overdue_checker", None)
 	if checker:
 		checker.shutdown()
->>>>>>> 9923707 (Implement Telegram integration with calendar and notification services)
+

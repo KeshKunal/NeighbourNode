@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from supabase import Client
 from app.schemas.transaction import TransactionStatus
 
@@ -49,7 +48,6 @@ class SupabaseService:
         
     def get_transaction(self, tx_id: str):
         return self.db.table("transactions").select("*").eq("id", tx_id).execute().data
-=======
 from __future__ import annotations
 
 import logging
@@ -173,4 +171,4 @@ class SupabaseService:
 		except Exception:
 			logger.exception("supabase.overdue.fetch.failed")
 			return []
->>>>>>> 9923707 (Implement Telegram integration with calendar and notification services)
+

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional, Any
@@ -24,7 +23,6 @@ class GenericResponse(BaseModel):
     success: bool
     message: str
     data: Optional[Any] = None
-=======
 from __future__ import annotations
 
 from datetime import datetime
@@ -79,4 +77,4 @@ class MatchResult(BaseModel):
 	owner_id: Optional[str] = None
 	item_id: Optional[str] = None
 	proposed_time: Optional[str] = None
->>>>>>> 9923707 (Implement Telegram integration with calendar and notification services)
+

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from enum import Enum
@@ -33,7 +32,6 @@ class TransactionResponse(TransactionBase):
     updated_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
-=======
 from __future__ import annotations
 
 from enum import Enum
@@ -54,4 +52,3 @@ class TransactionUpdateResult(BaseModel):
 	message: str
 	transaction_id: str | None = None
 	item_id: str | None = None
->>>>>>> 9923707 (Implement Telegram integration with calendar and notification services)
