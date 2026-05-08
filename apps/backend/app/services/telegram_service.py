@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
+import asyncio
 import logging
 from typing import Any
 
@@ -20,9 +23,22 @@ from app.schemas.telegram import (
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_PICKUP_SPOT = "Lobby"
+LENDER_BATCH_SIZE = 3
+TIMEZONE_NAME = "Asia/Kolkata"
+
+
 @dataclass(frozen=True)
 class TelegramService:
 	settings: Settings
+	_pending_returns: dict[int, "PendingReturnRequest"] | None = None
+	_pending_lock: asyncio.Lock | None = None
+
+	def __post_init__(self) -> None:
+		if self._pending_returns is None:
+			object.__setattr__(self, "_pending_returns", {})
+		if self._pending_lock is None:
+			object.__setattr__(self, "_pending_lock", asyncio.Lock())
 
 	@property
 	def _bot(self) -> Bot | None:
@@ -98,23 +114,51 @@ class TelegramService:
 		)
 
 	async def send_borrow_approval(self, message: BorrowApprovalMessage) -> TelegramSendResult:
-		text_lines = [
-			"New borrow request:",
-			f"Item: {message.item_name}",
-		]
-		if message.borrower_name:
-			text_lines.append(f"Borrower: {message.borrower_name}")
-		if message.requested_start and message.requested_end:
-			text_lines.append(
-				f"Time: {message.requested_start.isoformat()} - {message.requested_end.isoformat()}"
-			)
-		text_lines.append("Reply using the buttons below.")
-		text = "\n".join(text_lines)
+		text = self._format_borrow_request(
+			item_name=message.item_name,
+			borrower_name=message.borrower_name or "Neighbor",
+			requested_start=message.requested_start,
+			requested_end=message.requested_end,
+			pickup_spot=DEFAULT_PICKUP_SPOT,
+		)
 
 		return await self._send_message(
 			chat_id=message.owner_chat_id,
 			text=text,
 			reply_markup=self._build_approval_keyboard(message.transaction_id),
+		)
+
+	async def send_lender_batch(
+		self,
+		notifications: list[BorrowApprovalMessage],
+		pickup_spot: str | None = None,
+	) -> list[TelegramSendResult]:
+		spot = pickup_spot or DEFAULT_PICKUP_SPOT
+		results: list[TelegramSendResult] = []
+		for message in notifications[:LENDER_BATCH_SIZE]:
+			text = self._format_borrow_request(
+				item_name=message.item_name,
+				borrower_name=message.borrower_name or "Neighbor",
+				requested_start=message.requested_start,
+				requested_end=message.requested_end,
+				pickup_spot=spot,
+			)
+			results.append(
+				await self._send_message(
+					chat_id=message.owner_chat_id,
+					text=text,
+					reply_markup=self._build_approval_keyboard(message.transaction_id),
+				)
+			)
+		return results
+
+	async def send_lender_cancellation(self, chat_id: int) -> TelegramSendResult:
+		return await self._send_message(
+			chat_id=chat_id,
+			text=(
+				"Thanks for responding ❤️\n"
+				"The borrow request has already been fulfilled by another neighbor."
+			),
 		)
 
 	async def send_overdue_reminder(self, message: OverdueReminderMessage) -> TelegramSendResult:
@@ -187,3 +231,106 @@ class TelegramService:
 			user_id=update.callback_query.from_user.id,
 			message_id=message.message_id,
 		)
+
+	def parse_message_update(self, update_payload: dict[str, Any]) -> "TelegramMessageEvent | None":
+		bot = self._bot
+		if not bot:
+			logger.warning("telegram.update.no_bot")
+			return None
+		update = Update.de_json(update_payload, bot)
+		message = update.message if update else None
+		if not message or not message.text:
+			return None
+		return TelegramMessageEvent(
+			chat_id=message.chat.id,
+			user_id=message.from_user.id,
+			text=message.text.strip(),
+		)
+
+	async def set_pending_return(self, request: "PendingReturnRequest") -> None:
+		if not self._pending_lock or self._pending_returns is None:
+			return
+		async with self._pending_lock:
+			self._pending_returns[request.borrower_chat_id] = request
+
+	async def get_pending_return(self, chat_id: int) -> "PendingReturnRequest | None":
+		if not self._pending_lock or self._pending_returns is None:
+			return None
+		async with self._pending_lock:
+			return self._pending_returns.get(chat_id)
+
+	async def clear_pending_return(self, chat_id: int) -> None:
+		if not self._pending_lock or self._pending_returns is None:
+			return
+		async with self._pending_lock:
+			self._pending_returns.pop(chat_id, None)
+
+	async def send_text_message(self, chat_id: int, text: str) -> TelegramSendResult:
+		return await self._send_message(chat_id=chat_id, text=text)
+
+	async def send_calendar_link(
+		self,
+		chat_id: int,
+		item_name: str,
+		borrower_name: str,
+		lender_name: str,
+		pickup_spot: str,
+		return_deadline: str,
+		link: str,
+	) -> TelegramSendResult:
+		text = (
+			"Borrow approved.\n"
+			f"Item: {item_name}\n"
+			f"Borrower: {borrower_name}\n"
+			f"Lender: {lender_name}\n"
+			f"Pickup: {pickup_spot}\n"
+			f"Return by: {return_deadline}\n"
+			f"Calendar event: {link}"
+		)
+		return await self._send_message(chat_id=chat_id, text=text)
+
+	def _format_borrow_request(
+		self,
+		item_name: str,
+		borrower_name: str,
+		requested_start: datetime | None,
+		requested_end: datetime | None,
+		pickup_spot: str,
+	) -> str:
+		start_text = self._format_datetime(requested_start)
+		end_text = self._format_datetime(requested_end)
+		return (
+			"Your neighbor wants to borrow:\n\n"
+			f"🛠 Item: {item_name}\n"
+			f"👤 Borrower: {borrower_name}\n"
+			f"🕒 Start: {start_text}\n"
+			f"↩️ Return By: {end_text}\n"
+			f"📍 Pickup: {pickup_spot}\n\n"
+			"Reply using the buttons below."
+		)
+
+	def _format_datetime(self, value: datetime | None) -> str:
+		if not value:
+			return "TBD"
+			tz = ZoneInfo(TIMEZONE_NAME)
+			return value.astimezone(tz).strftime("%Y-%m-%d %I:%M %p %Z")
+
+
+@dataclass(frozen=True)
+class PendingReturnRequest:
+	transaction_id: str
+	item_id: str
+	item_name: str
+	borrower_chat_id: int
+	lender_chat_id: int
+	borrower_name: str
+	lender_name: str
+	pickup_location: str
+	borrow_start: datetime
+
+
+@dataclass(frozen=True)
+class TelegramMessageEvent:
+	chat_id: int
+	user_id: int
+	text: str
