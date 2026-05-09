@@ -1,4 +1,4 @@
-import { Item, BorrowByNameRequest, BorrowResponse } from "@/types";
+import { Item, BorrowResponse } from "@/types";
 
 const API_BASE = "/api";
 
@@ -8,9 +8,16 @@ export async function fetchItems(): Promise<Item[]> {
   return res.json();
 }
 
-export async function orchestrateBorrow(
-  payload: BorrowByNameRequest
-): Promise<BorrowResponse> {
+/**
+ * Portal-first borrow: user already selected an item from the catalog.
+ * Sends item_id directly to the orchestrator.
+ */
+export async function borrowItem(payload: {
+  item_id: string;
+  borrower_id: string;
+  requested_start: string;
+  requested_end: string;
+}): Promise<BorrowResponse> {
   const res = await fetch(`${API_BASE}/api/orchestrate/borrow`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

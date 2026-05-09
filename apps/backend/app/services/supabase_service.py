@@ -71,6 +71,21 @@ class SupabaseService:
             return []
         return self._db.table("users").insert(user_data).execute().data or []
 
+    # ─── CRUD: Items (single) ────────────────────────────────────
+
+    def get_item(self, item_id: str) -> dict | None:
+        """Fetch a single item by ID. Used by the portal-first orchestrator."""
+        if not self._has_client():
+            return None
+        data = (
+            self._db.table("items")
+            .select("*")
+            .eq("id", item_id)
+            .execute()
+            .data
+        )
+        return data[0] if data else None
+
     # ─── CRUD: Transactions ──────────────────────────────────────
 
     def create_transaction(self, tx_data: dict) -> list[dict]:
@@ -89,6 +104,26 @@ class SupabaseService:
             .data
         )
         return data[0] if data else None
+
+    def update_status(self, transaction_id: str, status: TransactionStatus) -> dict | None:
+        """
+        Advance a transaction through the lifecycle:
+        pending_approval → reserved → active → returned / cancelled.
+        Returns the updated row or None on failure.
+        """
+        if not self._has_client():
+            return None
+        try:
+            response = (
+                self._db.table("transactions")
+                .update({"status": status.value})
+                .eq("id", transaction_id)
+                .execute()
+            )
+            return response.data[0] if response.data else None
+        except Exception:
+            logger.exception("supabase.update_status.failed")
+            return None
 
     # ─── Matchmaker: Real Inventory Search ───────────────────────
 
