@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
 import { ItemCard } from "@/components/ItemCard";
-import { BorrowDialog } from "@/components/BorrowDialog";
+import { AskAIDialog } from "@/components/AskAIDialog";
 import { mockItems, mockUsers } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { Map as MapIcon } from "lucide-react";
@@ -17,26 +17,27 @@ const containerVariants = {
   show: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.1
-    }
-  }
+      staggerChildren: 0.1,
+    },
+  },
 };
 
 export default function Home() {
   const [showMap, setShowMap] = useState(true);
+  const [askAIOpen, setAskAIOpen] = useState(false);
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-4rem)] overflow-hidden">
       {/* Map Section */}
-      <div 
+      <div
         className={`transition-all duration-500 ease-in-out relative border-b lg:border-b-0 lg:border-r border-border/40
           ${showMap ? "w-full lg:w-1/2 h-[40vh] lg:h-full opacity-100" : "w-0 h-0 opacity-0 overflow-hidden"}
         `}
       >
         <Map />
-        {/* Floating Borrow Button */}
+        {/* Floating Ask AI Button */}
         <button
-          onClick={() => setBorrowDialogOpen(true)}
+          onClick={() => setAskAIOpen(true)}
           className="absolute bottom-6 right-6 z-[1000] bg-primary text-primary-foreground px-6 py-3 rounded-full font-semibold shadow-lg hover:opacity-90 transition-all hover:scale-105 flex items-center gap-2"
         >
           <span className="text-lg">🔍</span> Ask AI to Find
@@ -44,7 +45,7 @@ export default function Home() {
       </div>
 
       {/* Catalog Grid Section */}
-      <div 
+      <div
         className={`transition-all duration-500 ease-in-out h-full overflow-y-auto bg-background/50
           ${showMap ? "w-full lg:w-1/2" : "w-full"}
         `}
@@ -57,8 +58,8 @@ export default function Home() {
                 Browse items available to borrow in your neighbourhood.
               </p>
             </div>
-            <Button 
-              variant={showMap ? "secondary" : "outline"} 
+            <Button
+              variant={showMap ? "secondary" : "outline"}
               onClick={() => setShowMap(!showMap)}
               className="hidden lg:flex"
             >
@@ -66,11 +67,11 @@ export default function Home() {
               {showMap ? "Hide Map" : "Show Map"}
             </Button>
           </div>
-          
+
           {/* Mobile toggle button */}
           <div className="lg:hidden mb-4">
-             <Button 
-              variant={showMap ? "secondary" : "outline"} 
+            <Button
+              variant={showMap ? "secondary" : "outline"}
               onClick={() => setShowMap(!showMap)}
               className="w-full"
             >
@@ -78,8 +79,8 @@ export default function Home() {
               {showMap ? "Hide Map" : "Show Map"}
             </Button>
           </div>
-          
-          <motion.div 
+
+          <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="show"
@@ -93,10 +94,10 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Borrow Dialog */}
-      <BorrowDialog
-        open={borrowDialogOpen}
-        onClose={() => setBorrowDialogOpen(false)}
+      {/* AI Search Dialog (global, searches by name) */}
+      <AskAIDialog
+        isOpen={askAIOpen}
+        onOpenChange={setAskAIOpen}
       />
     </div>
   );
