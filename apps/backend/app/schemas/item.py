@@ -13,11 +13,12 @@ from .transaction import TransactionStatus
 
 
 class ItemBase(BaseModel):
-    name: str
+    title: str
     description: Optional[str] = None
     category: Optional[str] = None
     condition: Optional[str] = None
     location_hint: Optional[str] = None
+    image_url: Optional[str] = None
     is_active: bool = True
     current_status: TransactionStatus = TransactionStatus.AVAILABLE
 
@@ -27,7 +28,7 @@ class ItemCreate(ItemBase):
 
 
 class ItemUpdate(BaseModel):
-    name: Optional[str] = None
+    title: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     condition: Optional[str] = None

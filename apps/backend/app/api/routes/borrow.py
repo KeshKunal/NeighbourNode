@@ -13,7 +13,7 @@ from app.services.supabase_service import SupabaseService
 from app.api.dependencies import get_supabase_service
 
 
-router = APIRouter(prefix="/borrow", tags=["borrow"])
+router = APIRouter(prefix="/api/borrow", tags=["borrow"])
 
 
 @router.post("/", response_model=BorrowResponse)

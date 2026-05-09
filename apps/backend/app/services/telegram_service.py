@@ -153,6 +153,31 @@ class TelegramService:
 			logger.exception("telegram.send.failed")
 			return TelegramSendResult(ok=False, error=str(exc))
 
+	async def edit_message(
+		self,
+		chat_id: int,
+		message_id: int,
+		text: str,
+		reply_markup: InlineKeyboardMarkup | None = None,
+	) -> TelegramSendResult:
+		if self.settings.mock_external_services:
+			logger.info("telegram.edit.mock", extra={"chat_id": chat_id, "message_id": message_id, "text": text})
+			return TelegramSendResult(ok=True, message_id=message_id)
+		bot = self._bot
+		if not bot:
+			return TelegramSendResult(ok=False, error="Telegram bot token missing")
+		try:
+			await bot.edit_message_text(
+				chat_id=chat_id,
+				message_id=message_id,
+				text=text,
+				reply_markup=reply_markup,
+			)
+			return TelegramSendResult(ok=True, message_id=message_id)
+		except Exception as exc:
+			logger.exception("telegram.edit.failed")
+			return TelegramSendResult(ok=False, error=str(exc))
+
 	async def answer_callback(self, callback_id: str) -> None:
 		if self.settings.mock_external_services:
 			logger.info("telegram.callback.mock", extra={"callback_id": callback_id})

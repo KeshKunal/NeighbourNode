@@ -11,7 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
+import { CheckCircle2, Circle, Loader2, AlertCircle } from "lucide-react";
+import { borrowItem } from "@/lib/api";
 
 interface BorrowDialogProps {
   item: Item;
@@ -20,24 +21,58 @@ interface BorrowDialogProps {
 }
 
 export function BorrowDialog({ item, isOpen, onOpenChange }: BorrowDialogProps) {
-  // 0: Form, 1: Request sent, 2: AI Negotiating, 3: Waiting Approval, 4: Scheduled
+  // 0: Form, 1: Sending, 2: AI Negotiating, 3: Waiting Approval, 4: Scheduled, -1: Error
   const [step, setStep] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [txId, setTxId] = useState<string | null>(null);
+  const [dateValue, setDateValue] = useState("");
 
   const handleOpenChange = (open: boolean) => {
-    // Reset state when closing
     if (!open) {
-      setTimeout(() => setStep(0), 300); // Wait for transition
+      setTimeout(() => {
+        setStep(0);
+        setError(null);
+        setTxId(null);
+        setDateValue("");
+      }, 300);
     }
     onOpenChange(open);
   };
 
-  const advanceState = () => {
-    setStep((prev) => Math.min(prev + 1, 4));
+  const handleConfirm = async () => {
+    setStep(1);
+    setError(null);
+
+    try {
+      const now = new Date();
+      const start = dateValue
+        ? new Date(dateValue)
+        : new Date(now.getTime() + 2 * 60 * 60 * 1000);
+      const end = new Date(start.getTime() + 4 * 60 * 60 * 1000);
+
+      const result = await borrowItem({
+        item_id: item.id,
+        borrower_id: "demo-borrower-001", // In production: from auth context
+        requested_start: start.toISOString(),
+        requested_end: end.toISOString(),
+      });
+
+      if (result.success) {
+        setTxId(result.transaction_id || null);
+        setStep(3); // Waiting for owner approval
+      } else {
+        setError(result.message);
+        setStep(-1);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setStep(-1);
+    }
   };
 
   const trackerSteps = [
-    { label: "Request sent to AI Matchmaker" },
-    { label: "AI negotiating with owner via Telegram" },
+    { label: "Request sent to AI Orchestrator" },
+    { label: "Owner notified via Telegram" },
     { label: "Waiting for owner approval" },
     { label: "Calendar invite & handover scheduled" },
   ];
@@ -46,10 +81,12 @@ export function BorrowDialog({ item, isOpen, onOpenChange }: BorrowDialogProps) 
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Request {item.name}</DialogTitle>
+          <DialogTitle>Request {item.title || item.name}</DialogTitle>
           <DialogDescription>
             {step === 0
               ? "Fill out the details below to request this item."
+              : step === -1
+              ? "Something went wrong with your request."
               : "Track the status of your request in real-time."}
           </DialogDescription>
         </DialogHeader>
@@ -64,6 +101,8 @@ export function BorrowDialog({ item, isOpen, onOpenChange }: BorrowDialogProps) 
                 id="date"
                 type="datetime-local"
                 className="col-span-3"
+                value={dateValue}
+                onChange={(e) => setDateValue(e.target.value)}
               />
             </div>
             <div className="grid gap-2">
@@ -75,6 +114,16 @@ export function BorrowDialog({ item, isOpen, onOpenChange }: BorrowDialogProps) 
                 placeholder="E.g., I just need it for a couple of hours for a DIY project!"
                 className="resize-none"
               />
+            </div>
+          </div>
+        ) : step === -1 ? (
+          <div className="py-6">
+            <div className="p-4 rounded-lg border bg-red-500/10 border-red-500/20 flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-sm">Request Failed</p>
+                <p className="text-sm mt-1 opacity-80">{error}</p>
+              </div>
             </div>
           </div>
         ) : (
@@ -109,22 +158,27 @@ export function BorrowDialog({ item, isOpen, onOpenChange }: BorrowDialogProps) 
                 </div>
               );
             })}
+            {txId && (
+              <p className="text-xs font-mono text-muted-foreground mt-2">
+                TX: {txId}
+              </p>
+            )}
           </div>
         )}
 
         <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0 mt-4">
           {step === 0 ? (
-            <Button type="button" onClick={() => setStep(1)} className="w-full sm:w-auto">
+            <Button type="button" onClick={handleConfirm} className="w-full sm:w-auto">
               Confirm Request
             </Button>
-          ) : step < 4 ? (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={advanceState}
-              className="w-full sm:w-auto border-dashed border-primary/50 text-primary/70 hover:text-primary hover:border-primary"
-            >
-              Dev: Advance State
+          ) : step === 1 ? (
+            <Button disabled className="w-full sm:w-auto">
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Sending...
+            </Button>
+          ) : step === -1 ? (
+            <Button type="button" variant="outline" onClick={() => setStep(0)} className="w-full sm:w-auto">
+              Try Again
             </Button>
           ) : (
             <Button type="button" onClick={() => handleOpenChange(false)} className="w-full sm:w-auto">
