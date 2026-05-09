@@ -10,8 +10,8 @@ import { motion, Variants } from "framer-motion";
 import { Image as ImageIcon } from "lucide-react";
 
 interface ItemCardProps {
-  item: Item;
-  owner?: User;
+  item: any;
+  owner?: any;
 }
 
 const itemVariants: Variants = {
@@ -42,32 +42,33 @@ const FallbackImage = ({ src, alt }: { src?: string; alt: string }) => {
 
 export function ItemCard({ item, owner }: ItemCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const isAvailable = item.status === "available";
+  const status = item.current_status || item.status || "available";
+  const isAvailable = status === "available";
 
   return (
     <motion.div variants={itemVariants} whileHover={{ y: -5 }} className="h-full">
       <Card className="flex flex-col overflow-hidden transition-all shadow-sm hover:shadow-md h-full">
         <div className="relative h-48 w-full bg-muted">
-          <FallbackImage src={item.image_url} alt={item.name} />
+          <FallbackImage src={item.image_url} alt={item.title || item.name} />
           <div className="absolute top-2 right-2">
             <Badge
               variant={isAvailable ? "default" : "secondary"}
               className={isAvailable ? "bg-green-500 hover:bg-green-600" : ""}
             >
-              {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+              {status.charAt(0).toUpperCase() + status.slice(1)}
             </Badge>
           </div>
         </div>
         <CardHeader className="p-4 pb-0">
-          <h3 className="font-semibold text-lg line-clamp-1">{item.name}</h3>
+          <h3 className="font-semibold text-lg line-clamp-1">{item.title || item.name}</h3>
         </CardHeader>
         <CardContent className="p-4 pt-2 flex-1">
           <p className="text-sm text-muted-foreground line-clamp-2">
             {item.description}
           </p>
           <div className="mt-4 flex items-center text-sm">
-            <span className="font-medium">Owner Apt:</span>
-            <span className="ml-2">{owner?.apartment_number || "Unknown"}</span>
+            <span className="font-medium">Building/Location:</span>
+            <span className="ml-2">{owner?.building || item.location_hint || "Unknown"}</span>
           </div>
         </CardContent>
         <CardFooter className="p-4 pt-0">

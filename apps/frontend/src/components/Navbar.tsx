@@ -76,12 +76,12 @@ export function Navbar() {
                 </Button>
               ) : (
                 <>
-                  <Button variant="ghost" size="sm" asChild>
-                    <Link href="/auth/signin">Sign In</Link>
-                  </Button>
-                  <Button size="sm" asChild>
-                    <Link href="/auth/signup">Sign Up</Link>
-                  </Button>
+                  <Link href="/auth/signin" passHref legacyBehavior>
+                    <Button variant="ghost" size="sm">Sign In</Button>
+                  </Link>
+                  <Link href="/auth/signup" passHref legacyBehavior>
+                    <Button size="sm">Sign Up</Button>
+                  </Link>
                 </>
               )}
             </div>

@@ -50,17 +50,17 @@ export default function LandingPage() {
             </motion.p>
             
             <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Button size="lg" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full" asChild>
-                <Link href="/auth/signup">
+              <Link href="/auth/signup" passHref legacyBehavior>
+                <Button size="lg" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full">
                   Get Started
                   <ArrowRight className="ml-2 w-5 h-5" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full" asChild>
-                <Link href="/catalog">
+                </Button>
+              </Link>
+              <Link href="/catalog" passHref legacyBehavior>
+                <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full">
                   Browse Catalog
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             </motion.div>
           </motion.div>
         </div>

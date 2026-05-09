@@ -5,12 +5,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { mockItems, mockUsers } from "@/lib/mockData";
 import { motion } from "framer-motion";
 import { PackageSearch, PlusCircle, MoreHorizontal, Image as ImageIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
+import { User } from "@supabase/supabase-js";
 
 const FallbackImage = ({ src, alt }: { src?: string; alt: string }) => {
   const [error, setError] = useState(false);
@@ -34,15 +38,84 @@ const FallbackImage = ({ src, alt }: { src?: string; alt: string }) => {
 };
 
 export default function Dashboard() {
+  const [user, setUser] = useState<User | null>(null);
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [listedItems, setListedItems] = useState<any[]>([]);
+  const [borrowedItems, setBorrowedItems] = useState<any[]>([]);
   
-  const borrowedItems = [
-    { ...mockItems.find(i => i.id === "i3")!, dueDate: "Due in 2 hours" }
-  ];
+  // Add Item Form State
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
 
-  const listedItems = mockItems.filter(i => i.owner_id === "u1");
+  React.useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      if (data.user) {
+        fetchDashboardData(data.user.id);
+      }
+    });
+  }, []);
+
+  const fetchDashboardData = async (userId: string) => {
+    // Fetch listed items
+    const { data: listed } = await supabase
+      .from("items")
+      .select("*")
+      .eq("owner_id", userId);
+    setListedItems(listed || []);
+
+    // Fetch borrowed items
+    const { data: borrowed } = await supabase
+      .from("transactions")
+      .select("*, items(title, image_url), owner:users!owner_id(full_name)")
+      .eq("borrower_id", userId);
+    setBorrowedItems(borrowed || []);
+  };
 
   const handleAction = (actionName: string) => {
     toast(`Action triggered: ${actionName}`);
+  };
+
+  const handleAddItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return toast.error("Must be logged in.");
+    
+    setAdding(true);
+    try {
+      const res = await fetch("http://localhost:8000/api/items/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          owner_id: user.id,
+          name: title, // Backend schemas might expect 'name' not 'title', let's use 'title' as per strict instruction
+          // Actually user said items table uses "title", so I will pass "title"
+          title: title,
+          description,
+          category,
+          condition: "good",
+          location_hint: "Building A",
+          image_url: "",
+          current_status: "available",
+          is_active: true
+        })
+      });
+      
+      if (!res.ok) throw new Error("Failed to add item");
+      toast.success("Item listed successfully!");
+      setIsAddItemOpen(false);
+      // reset form
+      setTitle("");
+      setDescription("");
+      setCategory("");
+      // Refresh list
+      if (user) fetchDashboardData(user.id);
+    } catch (err) {
+      toast.error("Error listing item.");
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
@@ -59,12 +132,12 @@ export default function Dashboard() {
             Manage your items and track your current borrowings.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/catalog">
+        <Link href="/catalog" passHref legacyBehavior>
+          <Button>
             <PackageSearch className="w-4 h-4 mr-2" />
             Find New Items
-          </Link>
-        </Button>
+          </Button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -121,18 +194,18 @@ export default function Dashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {borrowedItems.map((item) => (
-                    <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
+                  {borrowedItems.map((tx) => (
+                    <TableRow key={tx.id} className="hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
-                          <FallbackImage src={item.image_url} alt={item.name} />
-                          {item.name}
+                          <FallbackImage src={tx.items?.image_url} alt={tx.items?.title} />
+                          {tx.items?.title || "Unknown Item"}
                         </div>
                       </TableCell>
-                      <TableCell>{mockUsers.find(u => u.id === item.owner_id)?.name}</TableCell>
+                      <TableCell>{tx.owner?.full_name || "Unknown"}</TableCell>
                       <TableCell className="text-right">
                         <Badge variant="destructive" className="bg-orange-500 hover:bg-orange-600">
-                          {item.dueDate}
+                          {tx.status}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -160,9 +233,37 @@ export default function Dashboard() {
               <PlusCircle className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
               <h3 className="text-lg font-semibold">You aren&apos;t sharing any items yet.</h3>
               <p className="text-muted-foreground mb-6">Earn trust in your community by listing items you rarely use.</p>
-              <Button onClick={() => handleAction("Open List Item Modal")}>
-                List an Item
-              </Button>
+              
+              <Button onClick={() => setIsAddItemOpen(true)}>List an Item</Button>
+              
+              <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>List a New Item</DialogTitle>
+                    <DialogDescription>Share something with your neighbourhood. It will be available for others to borrow.</DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleAddItem} className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Title</label>
+                      <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Cordless Power Drill" required />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Description</label>
+                      <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Condition, accessories included, etc." />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Category</label>
+                      <Input value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Tools" />
+                    </div>
+                    <DialogFooter>
+                      <Button type="submit" disabled={adding}>
+                        {adding ? "Listing..." : "List Item"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
             </div>
           ) : (
             <div className="border rounded-md">
@@ -180,20 +281,20 @@ export default function Dashboard() {
                     <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
-                          <FallbackImage src={item.image_url} alt={item.name} />
-                          {item.name}
+                          <FallbackImage src={item.image_url} alt={item.title} />
+                          {item.title}
                         </div>
                       </TableCell>
                       <TableCell>
                         <Badge 
-                          variant={item.status === "available" ? "default" : "secondary"}
-                          className={item.status === "available" ? "bg-green-500" : ""}
+                          variant={item.current_status === "available" ? "default" : "secondary"}
+                          className={item.current_status === "available" ? "bg-green-500" : ""}
                         >
-                          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+                          {item.current_status.charAt(0).toUpperCase() + item.current_status.slice(1)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        {item.status === "available" ? "--" : "Charlie Davis (Apt 304)"}
+                        {item.current_status === "available" ? "--" : "In Use"}
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

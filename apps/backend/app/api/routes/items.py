@@ -4,7 +4,7 @@ from app.schemas.item import ItemCreate, ItemResponse, ItemUpdate
 from app.services.supabase_service import SupabaseService
 from app.api.dependencies import get_supabase_service
 
-router = APIRouter(prefix="/items", tags=["items"])
+router = APIRouter(prefix="/api/items", tags=["items"])
 
 @router.get("/", response_model=List[ItemResponse])
 async def list_items(status: Optional[str] = None, supabase: SupabaseService = Depends(get_supabase_service)):

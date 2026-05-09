@@ -14,27 +14,65 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  
+  const [fullName, setFullName] = useState("");
   const [telegramId, setTelegramId] = useState("");
   const [buildingId, setBuildingId] = useState("");
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-      // In a real app, we'd fetch the public.users table data here
-      // to get the actual telegram_chat_id and building_id
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      
+      if (user) {
+        // Optimistic load from metadata
+        setFullName(user.user_metadata?.full_name || "");
+        
+        // Fetch real data from our backend
+        try {
+          const res = await fetch(`http://localhost:8000/api/users/${user.id}`); // This route doesn't exist by user ID, only by chat_id right now.
+          // Wait, the backend has `get_user_by_telegram_id` at `/{chat_id}`. It doesn't have `/{user_id}`.
+          // Let's rely on supabase client to fetch public.users directly, or just not fetch for this demo, 
+          // or we can query Supabase directly since we have the client.
+          const { data: profile } = await supabase.from("users").select("*").eq("id", user.id).single();
+          if (profile) {
+            setFullName(profile.full_name || user.user_metadata?.full_name || "");
+            setTelegramId(profile.telegram_chat_id || "");
+            setBuildingId(profile.building || "");
+          }
+        } catch (err) {
+          console.error("Failed to load profile details", err);
+        }
+      }
       setLoading(false);
     };
     fetchUser();
   }, []);
 
   const handleSave = async () => {
+    if (!user) return;
     setSaving(true);
-    // Stub for saving user preferences
-    setTimeout(() => {
-      setSaving(false);
+    
+    try {
+      const res = await fetch('http://localhost:8000/api/users/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: user.id,
+          full_name: fullName,
+          telegram_chat_id: telegramId,
+          building: buildingId
+        })
+      });
+
+      if (!res.ok) throw new Error("Failed to save profile");
       toast.success("Profile updated successfully!");
-    }, 1000);
+    } catch (err) {
+      toast.error("An error occurred while saving.");
+      console.error(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (loading) {
@@ -57,8 +95,6 @@ export default function ProfilePage() {
     );
   }
 
-  const fullName = user.user_metadata?.full_name || "Neighbour";
-
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -67,10 +103,10 @@ export default function ProfilePage() {
     >
       <div className="flex items-center gap-4 mb-8">
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold">
-          {fullName.charAt(0).toUpperCase()}
+          {fullName ? fullName.charAt(0).toUpperCase() : "N"}
         </div>
         <div>
-          <h1 className="text-3xl font-bold">{fullName}</h1>
+          <h1 className="text-3xl font-bold">{fullName || "Neighbour"}</h1>
           <p className="text-muted-foreground">{user.email}</p>
         </div>
       </div>
@@ -120,7 +156,9 @@ export default function ProfilePage() {
                     Open Bot
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">Message /start to the bot to get your ID.</p>
+                <p className="text-xs text-muted-foreground font-medium text-primary/80">
+                  Message our bot @NeighbourNodeBot to get your Chat ID and paste it here.
+                </p>
               </div>
             </CardContent>
           </Card>
@@ -134,6 +172,14 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
+                <label className="text-sm font-medium">Full Name</label>
+                <Input 
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Alice Smith" 
+                />
+              </div>
+              <div className="space-y-2">
                 <label className="text-sm font-medium">Building / Apartment</label>
                 <Input 
                   value={buildingId}
@@ -141,7 +187,7 @@ export default function ProfilePage() {
                   placeholder="e.g. Building A, Apt 304" 
                 />
               </div>
-              <Button onClick={handleSave} disabled={saving}>
+              <Button onClick={handleSave} disabled={saving} className="mt-4">
                 {saving ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
                 ) : (

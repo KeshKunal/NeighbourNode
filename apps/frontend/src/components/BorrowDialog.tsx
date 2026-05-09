@@ -81,7 +81,7 @@ export function BorrowDialog({ item, isOpen, onOpenChange }: BorrowDialogProps) 
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Request {item.name}</DialogTitle>
+          <DialogTitle>Request {item.title || item.name}</DialogTitle>
           <DialogDescription>
             {step === 0
               ? "Fill out the details below to request this item."

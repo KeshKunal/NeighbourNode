@@ -138,8 +138,39 @@ async def _handle_approve(
             )
             logger.info("telegram.approve.borrower_notified", extra={"transaction_id": transaction_id})
 
-    # 4. If Calendar Service exists: Stub call to create_handoff_event
-    # TODO: calendar_service.create_handoff_event(...)
+    # 4. Google Calendar Handoff Event
+    if tx:
+        # Assuming tx has requested_start and requested_end, or we default them
+        from datetime import datetime, timedelta, timezone
+        
+        # parse iso format from db if available
+        start_str = tx.get("requested_start")
+        end_str = tx.get("requested_end")
+        start_time = datetime.fromisoformat(start_str) if start_str else datetime.now(timezone.utc)
+        end_time = datetime.fromisoformat(end_str) if end_str else start_time + timedelta(minutes=30)
+        
+        # In a real system, you'd pull borrower and owner emails
+        owner = supabase_service.get_user_by_id(tx.get("owner_id"))
+        attendees = []
+        if borrower.get("email"):
+            attendees.append(borrower.get("email"))
+        if owner.get("email"):
+            attendees.append(owner.get("email"))
+            
+        cal_req = CalendarEventRequest(
+            summary=f"NeighbourNode Handoff: {item_title}",
+            description=f"Transaction ID: {transaction_id}\nBorrower: {borrower.get('full_name')}\nOwner: {owner.get('full_name')}",
+            location=item.get("location_hint") or "Neighbourhood",
+            start_time=start_time,
+            end_time=end_time,
+            timezone="UTC",
+            attendees=attendees,
+        )
+        cal_res = calendar_service.create_handoff_event(cal_req)
+        if cal_res.ok:
+            logger.info("telegram.approve.calendar_event_created", extra={"event_id": cal_res.event_id})
+        else:
+            logger.warning("telegram.approve.calendar_event_failed", extra={"error": cal_res.error})
 
 async def _handle_decline(
     transaction_id: str,

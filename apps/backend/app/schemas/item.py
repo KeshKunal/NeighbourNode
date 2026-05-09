@@ -13,7 +13,7 @@ from .transaction import TransactionStatus
 
 
 class ItemBase(BaseModel):
-    name: str
+    title: str
     description: Optional[str] = None
     category: Optional[str] = None
     condition: Optional[str] = None
@@ -27,7 +27,7 @@ class ItemCreate(ItemBase):
 
 
 class ItemUpdate(BaseModel):
-    name: Optional[str] = None
+    title: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
     condition: Optional[str] = None

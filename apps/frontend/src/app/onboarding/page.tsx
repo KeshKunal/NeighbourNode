@@ -32,11 +32,11 @@ export default function OnboardingPage() {
             </p>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Button asChild className="w-full">
-              <Link href="/dashboard">
+            <Link href="/dashboard" passHref legacyBehavior>
+              <Button className="w-full">
                 Skip to Dashboard
-              </Link>
-            </Button>
+              </Button>
+            </Link>
           </CardFooter>
         </Card>
       </motion.div>

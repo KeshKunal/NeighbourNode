@@ -2,12 +2,10 @@
 
 import React, { useState } from "react";
 import dynamic from "next/dynamic";
-import { ItemCard } from "@/components/ItemCard";
 import { AskAIDialog } from "@/components/AskAIDialog";
-import { mockItems, mockUsers } from "@/lib/mockData";
+import { SmartSearch } from "@/components/SmartSearch";
 import { Button } from "@/components/ui/button";
 import { Map as MapIcon } from "lucide-react";
-import { motion } from "framer-motion";
 
 // Dynamically import Map with SSR disabled
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
@@ -80,17 +78,8 @@ export default function Catalog() {
             </Button>
           </div>
 
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className={`grid grid-cols-1 gap-6 ${showMap ? "sm:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}
-          >
-            {mockItems.map((item) => {
-              const owner = mockUsers.find((u) => u.id === item.owner_id);
-              return <ItemCard key={item.id} item={item} owner={owner} />;
-            })}
-          </motion.div>
+          {/* Smart Search & Results Grid */}
+          <SmartSearch />
         </div>
       </div>
 

@@ -71,6 +71,21 @@ class SupabaseService:
             return []
         return self._db.table("users").insert(user_data).execute().data or []
 
+    def update_user_profile(self, user_id: str, profile_data: dict) -> dict | None:
+        if not self._has_client():
+            return None
+        try:
+            profile_data["id"] = user_id
+            response = (
+                self._db.table("users")
+                .upsert(profile_data)
+                .execute()
+            )
+            return response.data[0] if response.data else None
+        except Exception:
+            logger.exception("supabase.update_user.failed")
+            return None
+
     # ─── CRUD: Items (single) ────────────────────────────────────
 
     def get_item(self, item_id: str) -> dict | None:
@@ -141,10 +156,10 @@ class SupabaseService:
             response = (
                 self._db.table("items")
                 .select(
-                    "id, name, description, category, condition, location_hint, "
+                    "id, title, description, category, condition, location_hint, "
                     "owner_id, users(id, full_name, telegram_chat_id, building, rating)"
                 )
-                .ilike("name", f"%{item_name}%")
+                .ilike("title", f"%{item_name}%")
                 .eq("current_status", TransactionStatus.AVAILABLE.value)
                 .eq("is_active", True)
                 .limit(5)
@@ -185,7 +200,7 @@ class SupabaseService:
                 self._db.table("transactions")
                 .select(
                     "*, "
-                    "items(name, location_hint), "
+                    "items(title, location_hint), "
                     "borrower:users!borrower_id(full_name, email, telegram_chat_id), "
                     "owner:users!owner_id(full_name, email, telegram_chat_id)"
                 )
@@ -295,7 +310,7 @@ class SupabaseService:
                 self._db.table("transactions")
                 .select(
                     "id, item_id, borrower_id, requested_end, "
-                    "items(name), "
+                    "items(title), "
                     "borrower:users!borrower_id(telegram_chat_id)"
                 )
                 .eq("status", TransactionStatus.RESERVED.value)
@@ -313,7 +328,7 @@ class SupabaseService:
                     OverdueReminderMessage(
                         transaction_id=row.get("id"),
                         borrower_chat_id=int(borrower_chat_id),
-                        item_name=item_info.get("name", ""),
+                        item_name=item_info.get("title", ""),
                         overdue_since=row.get("requested_end"),
                     )
                 )
