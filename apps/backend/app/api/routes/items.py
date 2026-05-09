@@ -19,7 +19,13 @@ async def create_item(item: ItemCreate, supabase: SupabaseService = Depends(get_
     try:
         # Ensure user exists in public.users to prevent Foreign Key violations
         # (especially if the user skipped the profile onboarding step)
-        supabase._db.table("users").upsert({"id": item.owner_id, "full_name": "Anonymous Neighbour"}).execute()
+        try:
+            supabase._db.table("users").upsert({
+                "id": item.owner_id, 
+                "full_name": "Anonymous Neighbour"
+            }).execute()
+        except Exception:
+            pass
         
         data = supabase.create_item(item.model_dump(mode="json"))
         if not data:

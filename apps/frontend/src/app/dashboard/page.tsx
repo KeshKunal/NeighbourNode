@@ -69,7 +69,7 @@ export default function Dashboard() {
     // Fetch borrowed items
     const { data: borrowed } = await supabase
       .from("transactions")
-      .select("*, items(title, image_url), owner:users!owner_id(full_name)")
+      .select("*, items(title), owner:users!owner_id(full_name)")
       .eq("borrower_id", userId);
     setBorrowedItems(borrowed || []);
   };
@@ -102,7 +102,10 @@ export default function Dashboard() {
         })
       });
       
-      if (!res.ok) throw new Error("Failed to add item");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || "Failed to add item");
+      }
       toast.success("Item listed successfully!");
       setIsAddItemOpen(false);
       // reset form
@@ -111,8 +114,8 @@ export default function Dashboard() {
       setCategory("");
       // Refresh list
       if (user) fetchDashboardData(user.id);
-    } catch (err) {
-      toast.error("Error listing item.");
+    } catch (err: any) {
+      toast.error(err.message || "Error listing item.");
     } finally {
       setAdding(false);
     }
@@ -196,8 +199,8 @@ export default function Dashboard() {
                     <TableRow key={tx.id} className="hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
-                          <FallbackImage src={tx.items?.image_url} alt={tx.items?.title} />
-                          {tx.items?.title || "Unknown Item"}
+                          <FallbackImage src={tx.items?.image_url} alt={tx.items?.name || tx.items?.title} />
+                          {tx.items?.name || tx.items?.title || "Unknown Item"}
                         </div>
                       </TableCell>
                       <TableCell>{tx.owner?.full_name || "Unknown"}</TableCell>
@@ -279,8 +282,8 @@ export default function Dashboard() {
                     <TableRow key={item.id} className="hover:bg-muted/50 transition-colors">
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-3">
-                          <FallbackImage src={item.image_url} alt={item.title} />
-                          {item.title}
+                          <FallbackImage src={item.image_url} alt={item.name || item.title} />
+                          {item.name || item.title}
                         </div>
                       </TableCell>
                       <TableCell>

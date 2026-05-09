@@ -4,10 +4,8 @@ from typing import Optional
 
 class UserBase(BaseModel):
     full_name: str
-    phone: Optional[str] = None
     email: Optional[str] = None
-    building: Optional[str] = None
-    unit: Optional[str] = None
+    building_identifier: Optional[str] = None
     telegram_chat_id: Optional[str] = None
 
 class UserCreate(UserBase):
@@ -17,7 +15,7 @@ class UserUpdate(BaseModel):
     user_id: str
     full_name: Optional[str] = None
     telegram_chat_id: Optional[str] = None
-    building: Optional[str] = None
+    building_identifier: Optional[str] = None
 
 class UserResponse(UserBase):
     id: str

@@ -15,11 +15,6 @@ from .transaction import TransactionStatus
 class ItemBase(BaseModel):
     title: str
     description: Optional[str] = None
-    category: Optional[str] = None
-    condition: Optional[str] = None
-    location_hint: Optional[str] = None
-    image_url: Optional[str] = None
-    is_active: bool = True
     current_status: TransactionStatus = TransactionStatus.AVAILABLE
 
 
@@ -30,10 +25,6 @@ class ItemCreate(ItemBase):
 class ItemUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
-    category: Optional[str] = None
-    condition: Optional[str] = None
-    location_hint: Optional[str] = None
-    is_active: Optional[bool] = None
     current_status: Optional[TransactionStatus] = None
 
 

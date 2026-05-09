@@ -156,8 +156,8 @@ class SupabaseService:
             response = (
                 self._db.table("items")
                 .select(
-                    "id, title, description, category, condition, location_hint, "
-                    "owner_id, users(id, full_name, telegram_chat_id, building, rating)"
+                    "id, title, description, "
+                    "owner_id, users(id, full_name, telegram_chat_id, building_identifier, rating)"
                 )
                 .ilike("title", f"%{item_name}%")
                 .eq("current_status", TransactionStatus.AVAILABLE.value)
@@ -200,7 +200,7 @@ class SupabaseService:
                 self._db.table("transactions")
                 .select(
                     "*, "
-                    "items(title, location_hint), "
+                    "items(title), "
                     "borrower:users!borrower_id(full_name, email, telegram_chat_id), "
                     "owner:users!owner_id(full_name, email, telegram_chat_id)"
                 )
