@@ -4,7 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, PackageSearch, ShieldCheck, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -50,16 +50,12 @@ export default function LandingPage() {
             </motion.p>
             
             <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link href="/auth/signup" passHref legacyBehavior>
-                <Button size="lg" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full">
-                  Get Started
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
+              <Link href="/auth/signup" className={buttonVariants({ size: "lg", className: "w-full sm:w-auto text-lg h-14 px-8 rounded-full" })}>
+                Get Started
+                <ArrowRight className="ml-2 w-5 h-5" />
               </Link>
-              <Link href="/catalog" passHref legacyBehavior>
-                <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full">
-                  Browse Catalog
-                </Button>
+              <Link href="/catalog" className={buttonVariants({ size: "lg", variant: "outline", className: "w-full sm:w-auto text-lg h-14 px-8 rounded-full" })}>
+                Browse Catalog
               </Link>
             </motion.div>
           </motion.div>

@@ -18,6 +18,7 @@ class ItemBase(BaseModel):
     category: Optional[str] = None
     condition: Optional[str] = None
     location_hint: Optional[str] = None
+    image_url: Optional[str] = None
     is_active: bool = True
     current_status: TransactionStatus = TransactionStatus.AVAILABLE
 

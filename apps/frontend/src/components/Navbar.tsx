@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Moon, Sun, Home, LayoutDashboard, Search, User as UserIcon, LogOut } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 
@@ -76,11 +76,11 @@ export function Navbar() {
                 </Button>
               ) : (
                 <>
-                  <Link href="/auth/signin" passHref legacyBehavior>
-                    <Button variant="ghost" size="sm">Sign In</Button>
+                  <Link href="/auth/signin" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    Sign In
                   </Link>
-                  <Link href="/auth/signup" passHref legacyBehavior>
-                    <Button size="sm">Sign Up</Button>
+                  <Link href="/auth/signup" className={buttonVariants({ size: "sm" })}>
+                    Sign Up
                   </Link>
                 </>
               )}

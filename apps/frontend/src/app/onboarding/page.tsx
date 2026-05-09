@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
 
@@ -32,10 +32,8 @@ export default function OnboardingPage() {
             </p>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
-            <Link href="/dashboard" passHref legacyBehavior>
-              <Button className="w-full">
-                Skip to Dashboard
-              </Button>
+            <Link href="/dashboard" className={buttonVariants({ className: "w-full" })}>
+              Skip to Dashboard
             </Link>
           </CardFooter>
         </Card>

@@ -17,7 +17,11 @@ async def list_items(status: Optional[str] = None, supabase: SupabaseService = D
 @router.post("/", response_model=ItemResponse)
 async def create_item(item: ItemCreate, supabase: SupabaseService = Depends(get_supabase_service)):
     try:
-        data = supabase.create_item(item.model_dump())
+        # Ensure user exists in public.users to prevent Foreign Key violations
+        # (especially if the user skipped the profile onboarding step)
+        supabase._db.table("users").upsert({"id": item.owner_id, "full_name": "Anonymous Neighbour"}).execute()
+        
+        data = supabase.create_item(item.model_dump(mode="json"))
         if not data:
             raise HTTPException(status_code=400, detail="Failed to create item")
         return data[0]

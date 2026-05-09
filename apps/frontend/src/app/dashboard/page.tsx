@@ -132,11 +132,9 @@ export default function Dashboard() {
             Manage your items and track your current borrowings.
           </p>
         </div>
-        <Link href="/catalog" passHref legacyBehavior>
-          <Button>
-            <PackageSearch className="w-4 h-4 mr-2" />
-            Find New Items
-          </Button>
+        <Link href="/catalog" className={buttonVariants({ className: "gap-2" })}>
+          <PackageSearch className="w-4 h-4" />
+          Find New Items
         </Link>
       </div>
 
