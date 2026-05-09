@@ -29,3 +29,24 @@ export async function borrowItem(payload: {
   }
   return res.json();
 }
+
+/**
+ * AI Matchmaker flow: searches by name instead of item_id.
+ */
+export async function orchestrateBorrow(payload: {
+  item_name: string;
+  borrower_id: string;
+  requested_start: string;
+  requested_end: string;
+}): Promise<BorrowResponse> {
+  const res = await fetch(`${API_BASE}/api/orchestrate/ask`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Request failed" }));
+    throw new Error(error.detail || `Borrow failed: ${res.status}`);
+  }
+  return res.json();
+}

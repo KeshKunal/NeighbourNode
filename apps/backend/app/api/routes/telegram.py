@@ -29,7 +29,7 @@ from app.services.telegram_service import TelegramService
 
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/telegram", tags=["telegram"])
+router = APIRouter(prefix="/api/telegram", tags=["telegram"])
 
 
 @router.post("/webhook", response_model=WebhookAck)
@@ -72,7 +72,7 @@ async def _handle_callback(
         return
 
     if action == TelegramCallbackAction.DECLINE:
-        logger.info("telegram.callback.decline.pending", extra={"transaction_id": tx_id})
+        await _handle_decline(tx_id, event, telegram_service, supabase_service)
         return
 
     if action == TelegramCallbackAction.DONE:
@@ -104,13 +104,9 @@ async def _handle_approve(
     logger.info("telegram.approve.start", extra={"transaction_id": transaction_id})
 
     # 1. Update DB: Mark transaction as RESERVED
-    # (Since supabase_service methods are synchronous, we call them directly)
     updated_tx = supabase_service.update_status(transaction_id, TransactionStatus.RESERVED)
     if not updated_tx:
-        logger.warning(
-            "telegram.approve.update_failed",
-            extra={"transaction_id": transaction_id},
-        )
+        logger.warning("telegram.approve.update_failed", extra={"transaction_id": transaction_id})
         return
 
     # 2. Notify Owner: Edit original message to remove buttons and append "✅ Approved!"
@@ -129,22 +125,46 @@ async def _handle_approve(
         borrower_id = tx.get("borrower_id")
 
         item = supabase_service.get_item(item_id) if item_id else {}
-        item_name = item.get("name", "Unknown Item")
+        item_title = item.get("title", "Unknown Item")  # Strict DB schema uses title
 
         borrower = supabase_service.get_user_by_id(borrower_id) if borrower_id else {}
         borrower_chat_id = borrower.get("telegram_chat_id")
 
         if borrower_chat_id:
-            confirm_text = f"🎉 Your request for {item_name} was approved! Please coordinate pickup."
+            confirm_text = f"🎉 Good news! Your request for {item_title} was approved. Please coordinate pickup with the owner."
             await telegram_service._send_message(
                 chat_id=int(borrower_chat_id),
                 text=confirm_text,
             )
-            logger.info(
-                "telegram.approve.borrower_notified",
-                extra={"transaction_id": transaction_id, "borrower_chat_id": borrower_chat_id},
-            )
+            logger.info("telegram.approve.borrower_notified", extra={"transaction_id": transaction_id})
 
     # 4. If Calendar Service exists: Stub call to create_handoff_event
     # TODO: calendar_service.create_handoff_event(...)
+
+async def _handle_decline(
+    transaction_id: str,
+    event: TelegramCallbackEvent,
+    telegram_service: TelegramService,
+    supabase_service: SupabaseService,
+) -> None:
+    """
+    Decline → CANCELLED → Notify Owner.
+    """
+    logger.info("telegram.decline.start", extra={"transaction_id": transaction_id})
+
+    # 1. Update DB status to cancelled
+    updated_tx = supabase_service.update_status(transaction_id, TransactionStatus.CANCELLED)
+    if not updated_tx:
+        logger.warning("telegram.decline.update_failed", extra={"transaction_id": transaction_id})
+        return
+
+    # 2. Edit the owner's message to show "❌ Declined"
+    if event.message_id:
+        await telegram_service.edit_message(
+            chat_id=event.chat_id,
+            message_id=event.message_id,
+            text=f"❌ Declined\n\nTransaction ID: {transaction_id}",
+            reply_markup=None,
+        )
+
 
