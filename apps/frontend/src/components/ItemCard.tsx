@@ -22,7 +22,11 @@ const itemVariants: Variants = {
 const FallbackImage = ({ src, alt }: { src?: string; alt: string }) => {
   const [error, setError] = useState(false);
 
-  if (!src || error) {
+  // Use AI to generate a contextual image based on the item title!
+  const defaultImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(alt + ' realistic product photography clean background')}?width=600&height=400&nologo=true`;
+  const imageSrc = src || defaultImage;
+
+  if (error) {
     return (
       <div className="flex items-center justify-center w-full h-full text-muted-foreground bg-muted">
         <ImageIcon className="w-8 h-8 opacity-50" />
@@ -32,7 +36,7 @@ const FallbackImage = ({ src, alt }: { src?: string; alt: string }) => {
 
   return (
     <img
-      src={src}
+      src={imageSrc}
       alt={alt}
       onError={() => setError(true)}
       className="w-full h-full object-cover"

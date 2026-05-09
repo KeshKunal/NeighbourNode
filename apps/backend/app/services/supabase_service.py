@@ -200,9 +200,8 @@ class SupabaseService:
                 self._db.table("transactions")
                 .select(
                     "*, "
-                    "items(title), "
-                    "borrower:users!borrower_id(full_name, email, telegram_chat_id), "
-                    "owner:users!owner_id(full_name, email, telegram_chat_id)"
+                    "items(title, users(full_name, email, telegram_chat_id)), "
+                    "borrower:users!borrower_id(full_name, email, telegram_chat_id)"
                 )
                 .eq("id", transaction_id)
                 .execute()
