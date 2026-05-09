@@ -38,7 +38,7 @@ export default function ProfilePage() {
           if (profile) {
             setFullName(profile.full_name || user.user_metadata?.full_name || "");
             setTelegramId(profile.telegram_chat_id || "");
-            setBuildingId(profile.building || "");
+            setBuildingId(profile.building_identifier || "");
           }
         } catch (err) {
           console.error("Failed to load profile details", err);
@@ -61,7 +61,7 @@ export default function ProfilePage() {
           user_id: user.id,
           full_name: fullName,
           telegram_chat_id: telegramId,
-          building: buildingId
+          building_identifier: buildingId
         })
       });
 
