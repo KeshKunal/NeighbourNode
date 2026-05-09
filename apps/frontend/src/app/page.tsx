@@ -1,104 +1,115 @@
 "use client";
 
-import React, { useState } from "react";
-import dynamic from "next/dynamic";
-import { ItemCard } from "@/components/ItemCard";
-import { AskAIDialog } from "@/components/AskAIDialog";
-import { mockItems, mockUsers } from "@/lib/mockData";
-import { Button } from "@/components/ui/button";
-import { Map as MapIcon } from "lucide-react";
+import React from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
+import { ArrowRight, PackageSearch, ShieldCheck, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-// Dynamically import Map with SSR disabled
-const Map = dynamic(() => import("@/components/Map"), { ssr: false });
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.1,
-    },
-  },
+const fadeIn = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6 } }
 };
 
-export default function Home() {
-  const [showMap, setShowMap] = useState(true);
-  const [askAIOpen, setAskAIOpen] = useState(false);
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.2
+    }
+  }
+};
 
+export default function LandingPage() {
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-4rem)] overflow-hidden">
-      {/* Map Section */}
-      <div
-        className={`transition-all duration-500 ease-in-out relative border-b lg:border-b-0 lg:border-r border-border/40
-          ${showMap ? "w-full lg:w-1/2 h-[40vh] lg:h-full opacity-100" : "w-0 h-0 opacity-0 overflow-hidden"}
-        `}
-      >
-        <Map />
-        {/* Floating Ask AI Button */}
-        <button
-          onClick={() => setAskAIOpen(true)}
-          className="absolute bottom-6 right-6 z-[1000] bg-primary text-primary-foreground px-6 py-3 rounded-full font-semibold shadow-lg hover:opacity-90 transition-all hover:scale-105 flex items-center gap-2"
-        >
-          <span className="text-lg">🔍</span> Ask AI to Find
-        </button>
-      </div>
-
-      {/* Catalog Grid Section */}
-      <div
-        className={`transition-all duration-500 ease-in-out h-full overflow-y-auto bg-background/50
-          ${showMap ? "w-full lg:w-1/2" : "w-full"}
-        `}
-      >
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight">Catalog</h2>
-              <p className="text-muted-foreground mt-1">
-                Browse items available to borrow in your neighbourhood.
-              </p>
-            </div>
-            <Button
-              variant={showMap ? "secondary" : "outline"}
-              onClick={() => setShowMap(!showMap)}
-              className="hidden lg:flex"
-            >
-              <MapIcon className="w-4 h-4 mr-2" />
-              {showMap ? "Hide Map" : "Show Map"}
-            </Button>
-          </div>
-
-          {/* Mobile toggle button */}
-          <div className="lg:hidden mb-4">
-            <Button
-              variant={showMap ? "secondary" : "outline"}
-              onClick={() => setShowMap(!showMap)}
-              className="w-full"
-            >
-              <MapIcon className="w-4 h-4 mr-2" />
-              {showMap ? "Hide Map" : "Show Map"}
-            </Button>
-          </div>
-
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className={`grid grid-cols-1 gap-6 ${showMap ? "sm:grid-cols-2" : "sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"}`}
+    <div className="flex-1 flex flex-col">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden bg-background pt-24 pb-32">
+        <div className="absolute inset-0 bg-grid-pattern opacity-5" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/20 rounded-full blur-[120px] pointer-events-none" />
+        
+        <div className="container mx-auto px-4 relative z-10">
+          <motion.div 
+            initial="hidden" 
+            animate="visible" 
+            variants={staggerContainer}
+            className="max-w-4xl mx-auto text-center"
           >
-            {mockItems.map((item) => {
-              const owner = mockUsers.find((u) => u.id === item.owner_id);
-              return <ItemCard key={item.id} item={item} owner={owner} />;
-            })}
+            <motion.div variants={fadeIn} className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary mb-8 text-sm font-medium">
+              <Sparkles className="w-4 h-4" />
+              <span>Hyper-local Sharing Economy</span>
+            </motion.div>
+            
+            <motion.h1 variants={fadeIn} className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8">
+              Your neighbourhood is a <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-500">library.</span>
+            </motion.h1>
+            
+            <motion.p variants={fadeIn} className="text-xl text-muted-foreground mb-12 max-w-2xl mx-auto leading-relaxed">
+              Borrow, lend, and share items in your community. Powered by AI workflows and instant Telegram notifications to make sharing frictionless.
+            </motion.p>
+            
+            <motion.div variants={fadeIn} className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <Button size="lg" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full" asChild>
+                <Link href="/auth/signup">
+                  Get Started
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Link>
+              </Button>
+              <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg h-14 px-8 rounded-full" asChild>
+                <Link href="/catalog">
+                  Browse Catalog
+                </Link>
+              </Button>
+            </motion.div>
           </motion.div>
         </div>
-      </div>
+      </section>
 
-      {/* AI Search Dialog (global, searches by name) */}
-      <AskAIDialog
-        isOpen={askAIOpen}
-        onOpenChange={setAskAIOpen}
-      />
+      {/* Features Section */}
+      <section className="py-24 bg-muted/30">
+        <div className="container mx-auto px-4">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={staggerContainer}
+            className="grid grid-cols-1 md:grid-cols-3 gap-8"
+          >
+            <motion.div variants={fadeIn} className="bg-card p-8 rounded-2xl border shadow-sm">
+              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-6">
+                <PackageSearch className="w-6 h-6 text-primary" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">AI Matchmaking</h3>
+              <p className="text-muted-foreground">
+                Just tell the AI what you need. It searches local inventory, finds the best match, and negotiates the borrow.
+              </p>
+            </motion.div>
+
+            <motion.div variants={fadeIn} className="bg-card p-8 rounded-2xl border shadow-sm">
+              <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6">
+                <svg className="w-6 h-6 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-3">Telegram Integrated</h3>
+              <p className="text-muted-foreground">
+                Never miss a request. Approve borrows and coordinate pickups instantly right from your Telegram app.
+              </p>
+            </motion.div>
+
+            <motion.div variants={fadeIn} className="bg-card p-8 rounded-2xl border shadow-sm">
+              <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center mb-6">
+                <ShieldCheck className="w-6 h-6 text-green-500" />
+              </div>
+              <h3 className="text-xl font-bold mb-3">Verified Neighbours</h3>
+              <p className="text-muted-foreground">
+                Build a trusted community. See apartment identifiers and trust ratings before handing over your items.
+              </p>
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
     </div>
   );
 }
