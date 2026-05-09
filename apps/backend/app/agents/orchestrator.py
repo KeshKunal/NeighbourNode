@@ -76,7 +76,6 @@ class NeighbourOrchestrator:
         tx_data = {
             "item_id": item_id,
             "borrower_id": borrower_id,
-            "owner_id": owner_id,
             "requested_start": payload.requested_start.isoformat(),
             "requested_end": payload.requested_end.isoformat(),
             "status": TransactionStatus.PENDING_APPROVAL.value,

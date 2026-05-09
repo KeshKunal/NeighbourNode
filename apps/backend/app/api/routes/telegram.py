@@ -150,7 +150,7 @@ async def _handle_approve(
         end_time = datetime.fromisoformat(end_str) if end_str else start_time + timedelta(minutes=30)
         
         # In a real system, you'd pull borrower and owner emails
-        owner = supabase_service.get_user_by_id(tx.get("owner_id"))
+        owner = supabase_service.get_user_by_id(item.get("owner_id")) if item.get("owner_id") else {}
         attendees = []
         if borrower.get("email"):
             attendees.append(borrower.get("email"))

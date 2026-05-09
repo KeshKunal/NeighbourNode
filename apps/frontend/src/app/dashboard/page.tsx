@@ -19,7 +19,11 @@ import { User } from "@supabase/supabase-js";
 const FallbackImage = ({ src, alt }: { src?: string; alt: string }) => {
   const [error, setError] = useState(false);
 
-  if (!src || error) {
+  // Use AI to generate a contextual image based on the item title!
+  const defaultImage = `https://image.pollinations.ai/prompt/${encodeURIComponent(alt + ' realistic product photography clean background')}?width=400&height=400&nologo=true`;
+  const imageSrc = src || defaultImage;
+
+  if (error) {
     return (
       <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center flex-shrink-0">
         <ImageIcon className="w-5 h-5 text-muted-foreground" />
@@ -29,7 +33,7 @@ const FallbackImage = ({ src, alt }: { src?: string; alt: string }) => {
 
   return (
     <img
-      src={src}
+      src={imageSrc}
       alt={alt}
       onError={() => setError(true)}
       className="w-10 h-10 rounded-md object-cover flex-shrink-0"
@@ -43,6 +47,7 @@ export default function Dashboard() {
   const [adding, setAdding] = useState(false);
   const [listedItems, setListedItems] = useState<any[]>([]);
   const [borrowedItems, setBorrowedItems] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Add Item Form State
   const [title, setTitle] = useState("");
@@ -72,6 +77,8 @@ export default function Dashboard() {
       .select("*, items(title), owner:users!owner_id(full_name)")
       .eq("borrower_id", userId);
     setBorrowedItems(borrowed || []);
+    
+    setIsLoading(false);
   };
 
   const handleAction = (actionName: string) => {
@@ -176,7 +183,9 @@ export default function Dashboard() {
         </TabsList>
         
         <TabsContent value="borrowed">
-          {borrowedItems.length === 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center p-12"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
+          ) : borrowedItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 border rounded-xl bg-card text-center">
               <PackageSearch className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
               <h3 className="text-lg font-semibold">You haven&apos;t borrowed anything yet.</h3>
@@ -229,45 +238,25 @@ export default function Dashboard() {
         </TabsContent>
         
         <TabsContent value="listed">
-          {listedItems.length === 0 ? (
+          {isLoading ? (
+            <div className="flex justify-center p-12"><div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div></div>
+          ) : listedItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-12 border rounded-xl bg-card text-center">
               <PlusCircle className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
               <h3 className="text-lg font-semibold">You aren&apos;t sharing any items yet.</h3>
               <p className="text-muted-foreground mb-6">Earn trust in your community by listing items you rarely use.</p>
               
               <Button onClick={() => setIsAddItemOpen(true)}>List an Item</Button>
-              
-              <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>List a New Item</DialogTitle>
-                    <DialogDescription>Share something with your neighbourhood. It will be available for others to borrow.</DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleAddItem} className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Title</label>
-                      <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Cordless Power Drill" required />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Description</label>
-                      <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Condition, accessories included, etc." />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Category</label>
-                      <Input value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Tools" />
-                    </div>
-                    <DialogFooter>
-                      <Button type="submit" disabled={adding}>
-                        {adding ? "Listing..." : "List Item"}
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
             </div>
           ) : (
-            <div className="border rounded-md">
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Button onClick={() => setIsAddItemOpen(true)} className="gap-2">
+                  <PlusCircle className="w-4 h-4" />
+                  List New Item
+                </Button>
+              </div>
+              <div className="border rounded-md">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -313,7 +302,37 @@ export default function Dashboard() {
                 </TableBody>
               </Table>
             </div>
+            </div>
           )}
+
+          {/* Dialog moved outside conditional to keep it mounted */}
+          <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>List a New Item</DialogTitle>
+                <DialogDescription>Share something with your neighbourhood. It will be available for others to borrow.</DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleAddItem} className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Title</label>
+                  <Input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Cordless Power Drill" required />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Description</label>
+                  <Textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Condition, accessories included, etc." />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Category</label>
+                  <Input value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g. Tools" />
+                </div>
+                <DialogFooter>
+                  <Button type="submit" disabled={adding}>
+                    {adding ? "Listing..." : "List Item"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </TabsContent>
       </Tabs>
     </motion.div>
