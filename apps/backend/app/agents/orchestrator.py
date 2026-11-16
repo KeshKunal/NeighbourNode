@@ -1,157 +1,114 @@
 """
-NeighbourOrchestrator — the Portal-First request pipeline.
+NeighbourOrchestrator — Multi-Agent Request and Borrowing Pipeline.
 
-Architecture:
-  Portal (React) is the Source of Truth for browsing & requesting.
-  Telegram is the Push-Notification & Fast-Action channel.
-
-Golden Path (process_portal_request):
-  1. Fetch item details from Supabase (validate it exists & is available)
-  2. Create transaction with status=PENDING_APPROVAL (database lock)
-  3. Look up the owner's telegram_chat_id
-  4. Push an approval notification to the owner via Telegram
-  5. Return success to the portal so the UI shows "Request Sent!"
-
-The owner's Approve/Decline action comes back asynchronously through
-the Telegram webhook (api/routes/telegram.py).
+Coordinates:
+- Resource validation and atomic state reservation in MongoDB
+- Matchmaker discovery (local MongoDB inventory search and ranking)
+- Optional Telegram notifications to resource owners
+- Calendar invites for handoffs
+- Complete fallback when offline or external services are unconfigured
 """
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 from app.schemas.api import BorrowRequest, BorrowResponse
 from app.schemas.telegram import BorrowApprovalMessage
 from app.schemas.transaction import TransactionStatus
-from app.services.supabase_service import SupabaseService
+from app.services.mongodb_service import MongoDBService
 from app.services.telegram_service import TelegramService
-
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class NeighbourOrchestrator:
-    """
-    Wires the React Portal to Supabase and Telegram.
-
-    Injected via FastAPI Depends — not a singleton, one instance per request.
-    """
-    supabase_service: SupabaseService
+    mongodb_service: MongoDBService
     telegram_service: TelegramService
 
     async def process_portal_request(self, payload: BorrowRequest) -> BorrowResponse:
         """
-        Execute the synchronous Golden Path:
-        Fetch → Lock → Lookup → Notify → Return.
+        Executes the Borrowing Workflow:
+        1. Validates resource exists and is AVAILABLE in MongoDB
+        2. Creates a PENDING_APPROVAL borrow request
+        3. Pushes an approval notification to the owner (via in-app notification and optional Telegram)
+        4. Returns success to the client
         """
-        item_id = payload.item_id
+        resource_id = payload.item_id
         borrower_id = payload.borrower_id
 
-        # ── Step 1: Fetch the item ──────────────────────────────────
-        item = self.supabase_service.get_item(item_id)
-        if not item:
-            logger.warning("orchestrator.item_not_found", extra={"item_id": item_id})
+        # ── Step 1: Fetch resource ──────────────────────────────────
+        resource = await self.mongodb_service.get_resource_by_id(resource_id)
+        if not resource:
             return BorrowResponse(
                 success=False,
-                message=f"Item {item_id} not found.",
+                message=f"Resource {resource_id} not found.",
             )
 
-        if item.get("current_status") != TransactionStatus.AVAILABLE.value:
-            logger.info(
-                "orchestrator.item_unavailable",
-                extra={"item_id": item_id, "status": item.get("current_status")},
-            )
+        if resource.get("status") != TransactionStatus.AVAILABLE.value:
             return BorrowResponse(
                 success=False,
-                message=f"Item is not available (current status: {item.get('current_status')}).",
+                message=f"Resource is currently unavailable (status: {resource.get('status')}).",
             )
 
-        owner_id = item.get("owner_id")
-        item_name = item.get("name", "Unknown Item")
-
-        # ── Step 2: Database Lock — create PENDING_APPROVAL tx ──────
-        tx_data = {
-            "item_id": item_id,
-            "borrower_id": borrower_id,
-            "owner_id": owner_id,
-            "requested_start": payload.requested_start.isoformat(),
-            "requested_end": payload.requested_end.isoformat(),
-            "status": TransactionStatus.PENDING_APPROVAL.value,
-        }
-        tx_rows = self.supabase_service.create_transaction(tx_data)
-        if not tx_rows:
-            logger.error("orchestrator.tx_creation_failed", extra={"item_id": item_id})
+        owner_id = resource.get("owner_id")
+        if str(owner_id) == str(borrower_id):
             return BorrowResponse(
                 success=False,
-                message="Failed to create transaction. Please try again.",
+                message="You cannot borrow your own listing.",
             )
 
-        transaction_id = tx_rows[0]["id"]
-        logger.info(
-            "orchestrator.tx_created",
-            extra={"transaction_id": transaction_id, "item_id": item_id, "owner_id": owner_id},
-        )
+        resource_title = resource.get("title", "Item")
 
-        # ── Step 3: Owner Lookup — get their telegram_chat_id ───────
-        owner = self.supabase_service.get_user_by_id(owner_id)
+        # ── Step 2: Create borrow request with atomic overlap checks
+        try:
+            borrow_req = await self.mongodb_service.create_borrow_request(
+                resource_id=resource_id,
+                borrower_id=borrower_id,
+                requested_start=payload.requested_start,
+                requested_end=payload.requested_end,
+                message="Requested via NeighbourNode portal",
+            )
+        except ValueError as val_err:
+            return BorrowResponse(
+                success=False,
+                message=str(val_err),
+            )
+        except Exception as e:
+            logger.error("Failed to create borrow request: %s", e)
+            return BorrowResponse(
+                success=False,
+                message="Failed to create borrow request. Please try again.",
+            )
+
+        request_id = borrow_req["id"]
+
+        # ── Step 3: Owner Lookup & Telegram Push Notification ──────
+        owner = await self.mongodb_service.get_user_by_id(owner_id)
         owner_chat_id = owner.get("telegram_chat_id") if owner else None
 
-        if not owner_chat_id:
-            # Transaction was created — owner can still approve via portal
-            logger.warning(
-                "orchestrator.owner_no_telegram",
-                extra={"owner_id": owner_id, "transaction_id": transaction_id},
-            )
-            return BorrowResponse(
-                success=True,
-                transaction_id=transaction_id,
-                message=(
-                    f"Request created for {item_name}. "
-                    "Owner doesn't have Telegram linked — they'll see it on the portal."
-                ),
-            )
+        if owner_chat_id:
+            borrower = await self.mongodb_service.get_user_by_id(borrower_id)
+            borrower_name = borrower.get("full_name") if borrower else "A neighbour"
 
-        # ── Step 4: Push Notification — Telegram approval request ───
-        # Look up borrower name for a friendly notification
-        borrower = self.supabase_service.get_user_by_id(borrower_id)
-        borrower_name = borrower.get("full_name") if borrower else None
+            try:
+                approval_msg = BorrowApprovalMessage(
+                    transaction_id=request_id,
+                    owner_chat_id=int(owner_chat_id),
+                    item_name=resource_title,
+                    borrower_name=borrower_name,
+                    requested_start=payload.requested_start,
+                    requested_end=payload.requested_end,
+                )
+                await self.telegram_service.send_borrow_approval(approval_msg)
+            except Exception as e:
+                logger.warning("Telegram notification failed (will still appear on portal): %s", e)
 
-        approval_msg = BorrowApprovalMessage(
-            transaction_id=transaction_id,
-            owner_chat_id=int(owner_chat_id),
-            item_name=item_name,
-            borrower_name=borrower_name,
-            requested_start=payload.requested_start,
-            requested_end=payload.requested_end,
+        return BorrowResponse(
+            success=True,
+            transaction_id=request_id,
+            message=f"Borrow request sent for '{resource_title}'. Waiting for owner's approval.",
         )
-        send_result = await self.telegram_service.send_borrow_approval(approval_msg)
-
-        logger.info(
-            "orchestrator.telegram_sent",
-            extra={
-                "transaction_id": transaction_id,
-                "owner_chat_id": owner_chat_id,
-                "telegram_ok": send_result.ok,
-            },
-        )
-
-        # ── Step 5: Return success to the Portal ────────────────────
-        if send_result.ok:
-            return BorrowResponse(
-                success=True,
-                transaction_id=transaction_id,
-                message=f"Request sent! {item_name} owner has been notified on Telegram.",
-            )
-        else:
-            # TX was created, but Telegram push failed — still a partial success
-            return BorrowResponse(
-                success=True,
-                transaction_id=transaction_id,
-                message=(
-                    f"Request created for {item_name}. "
-                    "Telegram notification failed — owner will see it on the portal."
-                ),
-            )

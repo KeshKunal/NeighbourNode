@@ -1,53 +1,64 @@
 """
-Scavenger Agent — finds external listings when no local match exists.
+Scavenger Agent — searches local MongoDB listings across related categories
+when no exact match is found.
 
-Uses the Hack Club AI proxy (OpenAI-compatible) via llm_client.
+External discovery is optional and never fabricates local inventory.
 """
 from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
+from typing import Any, Dict, List
 
+from app.core.config import get_settings
+from app.db.mongodb import db, serialize_docs
+from app.schemas.transaction import TransactionStatus
 from app.services.llm_client import chat_completion
 
 from ..state import OrchestrationState, ScavengerResult
 
-
 logger = logging.getLogger(__name__)
 
 
-def _load_prompt() -> str:
-    repo_root = Path(__file__).resolve().parents[5]
-    prompt_path = repo_root / "packages" / "prompts" / "scavenger_prompt.md"
-    return prompt_path.read_text(encoding="utf-8")
-
-
-def _parse_scavenger_response(text: str) -> ScavengerResult:
-    try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return {"results": []}
-
-    results = payload.get("results") or []
-    return {"results": list(results)}
-
-
 async def run_scavenger(state: OrchestrationState) -> ScavengerResult:
-    """Ask the LLM to find external listings for the requested item."""
-    system_prompt = _load_prompt()
-    user_prompt = (
-        "Find external listings for the requested item.\n"
-        f"item_name: {state['item_name']}\n"
-        "location_hint: local neighborhood\n"
-        "max_distance_km: 5"
-    )
+    """
+    Search community inventory across related categories and descriptions.
+    """
+    item_name = state.get("item_name", "")
+    results: List[Dict[str, Any]] = []
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
+    if db.database is not None:
+        # Search all active resources in MongoDB matching partial words
+        words = [w for w in item_name.split() if len(w) > 2]
+        query_parts = [{"title": {"$regex": w, "$options": "i"}} for w in words]
+        query_parts.extend([{"description": {"$regex": w, "$options": "i"}} for w in words])
 
-    raw_response = chat_completion(messages)
-    logger.info("scavenger.llm_response", extra={"response": raw_response[:500]})
-    return _parse_scavenger_response(raw_response)
+        if query_parts:
+            cursor = db.database["resources"].find({
+                "$or": query_parts,
+                "status": TransactionStatus.AVAILABLE.value,
+            }).limit(5)
+            docs = await cursor.to_list(length=5)
+            for d in docs:
+                results.append({
+                    "title": d.get("title"),
+                    "category": d.get("category"),
+                    "locality": d.get("locality", "Bengaluru"),
+                    "source": "Local Community Alternative",
+                })
+
+    settings = get_settings()
+    if not results and settings.ai_api_key and settings.ai_api_base_url:
+        try:
+            prompt = (
+                f"Suggest 2 realistic nearby community alternatives or rental sources in Bengaluru for '{item_name}'. "
+                "Return JSON with 'results': list of objects with title, source, estimated_price."
+            )
+            raw = chat_completion([{"role": "user", "content": prompt}])
+            parsed = json.loads(raw)
+            if "results" in parsed:
+                results = parsed["results"]
+        except Exception as e:
+            logger.debug("Scavenger external fallback error: %s", e)
+
+    return {"results": results}

@@ -1,14 +1,16 @@
 """
-API request/response schemas — merged from Member 2 and Member 3.
-
-TransactionStatus is NOT defined here; import from schemas.transaction.
+API request/response schemas — merged and updated for MongoDB architecture.
 """
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Optional
-
+from typing import Any, List, Optional
 from pydantic import BaseModel, Field
+
+from app.schemas.common import GeoPoint
+from app.schemas.resource import ResourceResponse
+from app.schemas.skill import SkillResponse
+from app.schemas.users import UserPublicProfile
 
 
 # ─── Generic Responses ───────────────────────────────────────────
@@ -77,3 +79,22 @@ class CalendarEventResult(BaseModel):
     event_id: str | None = None
     html_link: str | None = None
     error: str | None = None
+
+
+# ─── AI Ask Query ────────────────────────────────────────────────
+
+class AIAskRequest(BaseModel):
+    query: str
+    user_id: Optional[str] = None
+    location: Optional[GeoPoint] = None
+
+
+class AIAskResponse(BaseModel):
+    intent: str = "resource"
+    keywords: List[str] = Field(default_factory=list)
+    category: Optional[str] = None
+    natural_language_answer: str
+    matched_resources: List[ResourceResponse] = Field(default_factory=list)
+    matched_skills: List[SkillResponse] = Field(default_factory=list)
+    matched_neighbours: List[UserPublicProfile] = Field(default_factory=list)
+    explanation: str

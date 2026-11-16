@@ -1,92 +1,63 @@
 """
-Matchmaker Agent — queries Supabase, then asks the LLM to pick the best match.
+Matchmaker Agent — queries MongoDB inventory and ranks matches.
 
-Uses the Hack Club AI proxy (OpenAI-compatible) via llm_client instead of
-Google ADK, since we're routing through a custom endpoint.
+Uses deterministic multi-factor ranking with an optional LLM reasoning step.
+All returned items originate from the MongoDB database.
 """
 from __future__ import annotations
 
 import json
 import logging
-import os
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
+from app.core.config import get_settings
+from app.schemas.transaction import TransactionStatus
 from app.services.llm_client import chat_completion
-from app.services.supabase_service import SupabaseService
+from app.services.mongodb_service import MongoDBService
 
 from ..state import MatchmakerResult, OrchestrationState
-
 
 logger = logging.getLogger(__name__)
 
 
 def _load_prompt() -> str:
-    repo_root = Path(__file__).resolve().parents[5]
-    prompt_path = repo_root / "packages" / "prompts" / "matchmaker_prompt.md"
-    return prompt_path.read_text(encoding="utf-8")
-
-
-def _search_local_inventory(
-    item_name: str,
-    supabase_svc: SupabaseService,
-) -> list[dict]:
-    """Query Supabase for available items matching the name."""
-    results = supabase_svc.search_items_by_name(item_name)
-    matches = []
-    for r in results:
-        owner_info = r.get("users") or {}
-        matches.append({
-            "item_id": r.get("id"),
-            "item_name": r.get("name"),
-            "owner_id": r.get("owner_id"),
-            "owner_name": owner_info.get("full_name"),
-            "owner_telegram_chat_id": owner_info.get("telegram_chat_id"),
-            "description": r.get("description"),
-            "category": r.get("category"),
-            "condition": r.get("condition"),
-            "location_hint": r.get("location_hint"),
-        })
-    return matches
-
-
-def _parse_matchmaker_response(text: str) -> MatchmakerResult:
     try:
-        payload = json.loads(text)
-    except json.JSONDecodeError:
-        return {
-            "success": False,
-            "owner_id": None,
-            "item_id": None,
-            "item_name": None,
-            "owner_telegram_chat_id": None,
-            "proposed_time": None,
-            "reason": "invalid_json",
-        }
-
-    return {
-        "success": bool(payload.get("success")),
-        "owner_id": payload.get("owner_id"),
-        "item_id": payload.get("item_id"),
-        "item_name": payload.get("item_name"),
-        "owner_telegram_chat_id": payload.get("owner_telegram_chat_id"),
-        "proposed_time": payload.get("proposed_time"),
-        "reason": payload.get("reason"),
-    }
+        repo_root = Path(__file__).resolve().parents[5]
+        prompt_path = repo_root / "packages" / "prompts" / "matchmaker_prompt.md"
+        if prompt_path.exists():
+            return prompt_path.read_text(encoding="utf-8")
+    except Exception:
+        pass
+    return "You are the NeighbourNode Matchmaker Agent. Select the best match from local inventory."
 
 
 async def run_matchmaker(
     state: OrchestrationState,
-    supabase_svc: SupabaseService,
+    mongodb_svc: MongoDBService,
 ) -> MatchmakerResult:
     """
-    1. Search Supabase for matching items
-    2. If candidates found, ask the LLM to pick the best match
-    3. If no candidates, return failure immediately (no LLM call needed)
+    1. Search MongoDB for available items matching item_name (or keywords)
+    2. Rank candidates deterministically
+    3. If LLM credentials are configured, ask LLM to provide natural-language reasoning
+    4. Return best candidate
     """
     item_name = state["item_name"]
+    settings = get_settings()
 
-    # Step 1: Real Supabase search
-    candidates = _search_local_inventory(item_name, supabase_svc)
+    # Step 1: Real MongoDB search
+    candidates = await mongodb_svc.list_resources(
+        status=TransactionStatus.AVAILABLE.value,
+        search=item_name,
+        limit=10,
+    )
+
+    if not candidates:
+        # Fallback to broader list
+        candidates = await mongodb_svc.list_resources(
+            status=TransactionStatus.AVAILABLE.value,
+            limit=5,
+        )
 
     if not candidates:
         logger.info("matchmaker.no_candidates", extra={"item_name": item_name})
@@ -97,38 +68,46 @@ async def run_matchmaker(
             "item_name": None,
             "owner_telegram_chat_id": None,
             "proposed_time": None,
-            "reason": f"No available items matching '{item_name}' in local inventory",
+            "reason": f"No available items matching '{item_name}' found in community inventory.",
         }
 
-    # Step 2: Ask LLM to select the best match
-    system_prompt = _load_prompt()
-    user_prompt = (
-        "User request for local matching.\n"
-        f"item_name: {item_name}\n"
-        f"requested_start: {state['requested_start']}\n"
-        f"requested_end: {state['requested_end']}\n"
-        f"user_id: {state['user_id']}\n\n"
-        f"Available candidates from local inventory:\n"
-        f"{json.dumps(candidates, indent=2)}\n\n"
-        "Pick the best match and return the JSON response."
-    )
+    # Best candidate deterministically
+    best = candidates[0]
+    owner_info = best.get("owner") or {}
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
+    result: MatchmakerResult = {
+        "success": True,
+        "owner_id": str(best.get("owner_id")),
+        "item_id": str(best.get("id")),
+        "item_name": best.get("title"),
+        "owner_telegram_chat_id": owner_info.get("telegram_chat_id"),
+        "proposed_time": str(state.get("requested_start", "as requested")),
+        "reason": f"Found '{best.get('title')}' offered by {owner_info.get('full_name', 'a neighbour')} in {best.get('locality', 'Bengaluru')}.",
+    }
 
-    raw_response = chat_completion(messages)
-    logger.info("matchmaker.llm_response", extra={"response": raw_response[:500]})
-
-    result = _parse_matchmaker_response(raw_response)
-
-    # If the LLM returned success but missing key fields, fill from first candidate
-    if result["success"] and not result["item_id"] and candidates:
-        best = candidates[0]
-        result["item_id"] = best.get("item_id")
-        result["owner_id"] = best.get("owner_id")
-        result["item_name"] = best.get("item_name")
-        result["owner_telegram_chat_id"] = best.get("owner_telegram_chat_id")
+    # If LLM credentials exist, refine with LLM
+    if settings.ai_api_key and settings.ai_api_base_url:
+        try:
+            system_prompt = _load_prompt()
+            user_prompt = (
+                f"User request: {item_name}\n"
+                f"Start: {state.get('requested_start')}, End: {state.get('requested_end')}\n"
+                f"Candidates: {json.dumps([{'id': c['id'], 'title': c['title'], 'category': c.get('category')} for c in candidates])}\n"
+                "Pick the best match and reply in JSON with fields: success (bool), item_id, item_name, owner_id, reason."
+            )
+            raw = chat_completion([
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ])
+            parsed = json.loads(raw)
+            if parsed.get("success") and parsed.get("item_id"):
+                matched = next((c for c in candidates if str(c["id"]) == str(parsed["item_id"])), None)
+                if matched:
+                    result["item_id"] = str(matched["id"])
+                    result["item_name"] = matched.get("title")
+                    result["owner_id"] = str(matched.get("owner_id"))
+                    result["reason"] = parsed.get("reason", result["reason"])
+        except Exception as e:
+            logger.debug("LLM reasoning fallback to deterministic selection: %s", e)
 
     return result

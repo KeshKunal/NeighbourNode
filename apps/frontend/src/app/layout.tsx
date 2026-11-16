@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import { Navbar } from "@/components/Navbar";
 import { Toaster } from "@/components/ui/sonner";
 import { DevToolsFAB } from "@/components/DevToolsFAB";
+import { AuthProvider } from "@/lib/authContext";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NeighbourNode - Hyper-local Sharing Economy",
-  description: "Borrow, lend, and share items in your community with AI-driven workflows.",
+  title: "NeighbourNode — Smart Community Resource & Skill Sharing Platform",
+  description: "Hyper-local community resource sharing and skill exchange powered by MongoDB and deterministic recommendation workflows.",
 };
 
 export default function RootLayout({
@@ -32,14 +33,16 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground">
+      <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-primary/20 selection:text-primary">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <Navbar />
-          <main className="flex-1 flex flex-col">
-            {children}
-          </main>
-          <Toaster position="bottom-right" />
-          <DevToolsFAB />
+          <AuthProvider>
+            <Navbar />
+            <main className="flex-1 flex flex-col">
+              {children}
+            </main>
+            <Toaster position="bottom-right" richColors />
+            <DevToolsFAB />
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

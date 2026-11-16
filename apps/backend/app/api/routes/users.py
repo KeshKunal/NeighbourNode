@@ -1,47 +1,87 @@
-from fastapi import APIRouter, Depends, HTTPException
-from app.schemas.users import UserCreate, UserResponse
-from app.services.supabase_service import SupabaseService
-from app.api.dependencies import get_supabase_service
+"""
+Users routes for NeighbourNode (/api/v1/users).
+"""
+from __future__ import annotations
 
-router = APIRouter(prefix="/api/users", tags=["users"])
+import logging
+from typing import Any, Dict, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status
 
-@router.post("/", response_model=UserResponse)
-async def create_user(user: UserCreate, supabase: SupabaseService = Depends(get_supabase_service)):
-    try:
-        data = supabase.create_user(user.model_dump(exclude_unset=True))
-        if not data:
-            raise HTTPException(status_code=400, detail="Failed to create user")
-        return data[0]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-        
-@router.get("/{chat_id}", response_model=UserResponse)
-async def get_user_by_telegram(chat_id: str, supabase: SupabaseService = Depends(get_supabase_service)):
-    try:
-        data = supabase.get_user_by_telegram_id(chat_id)
-        if not data:
-            raise HTTPException(status_code=404, detail="User not found")
-        return data[0]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+from app.api.dependencies import get_current_user, get_mongodb_service
+from app.schemas.review import ReviewResponse
+from app.schemas.users import UserProfileUpdate, UserPublicProfile, UserResponse
+from app.services.mongodb_service import MongoDBService
 
-from app.schemas.users import UserUpdate
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/users", tags=["users"])
 
+
+@router.get("/me", response_model=UserResponse)
+async def get_current_user_profile(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    mongodb_svc: MongoDBService = Depends(get_mongodb_service),
+) -> UserResponse:
+    user = await mongodb_svc.get_user_by_id(current_user["id"])
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserResponse(**user)
+
+
+@router.patch("/me", response_model=UserResponse)
+async def update_current_user_profile(
+    payload: UserProfileUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    mongodb_svc: MongoDBService = Depends(get_mongodb_service),
+) -> UserResponse:
+    update_data = payload.model_dump(exclude_unset=True)
+    updated = await mongodb_svc.update_user(current_user["id"], update_data)
+    if not updated:
+        raise HTTPException(status_code=400, detail="Failed to update profile")
+    return UserResponse(**updated)
+
+
+@router.get("/{user_id}", response_model=UserPublicProfile)
+async def get_public_user_profile(
+    user_id: str,
+    mongodb_svc: MongoDBService = Depends(get_mongodb_service),
+) -> UserPublicProfile:
+    user = await mongodb_svc.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return UserPublicProfile(
+        id=user["id"],
+        full_name=user["full_name"],
+        avatar_url=user.get("avatar_url"),
+        bio=user.get("bio"),
+        locality=user.get("locality", "Bengaluru"),
+        skills=user.get("skills", []),
+        interests=user.get("interests", []),
+        reputation_score=user.get("reputation_score", 4.5),
+        completed_exchanges=user.get("completed_exchanges", 0),
+        is_verified=user.get("is_verified", True),
+    )
+
+
+@router.get("/{user_id}/reviews", response_model=List[ReviewResponse])
+async def get_user_reviews(
+    user_id: str,
+    mongodb_svc: MongoDBService = Depends(get_mongodb_service),
+) -> List[ReviewResponse]:
+    reviews = await mongodb_svc.list_user_reviews(user_id)
+    return [ReviewResponse(**r) for r in reviews]
+
+
+# Backwards compatibility endpoints
 @router.put("/profile", response_model=UserResponse)
-async def update_profile(
-    payload: UserUpdate,
-    supabase: SupabaseService = Depends(get_supabase_service)
-):
-    try:
-        update_data = payload.model_dump(exclude_unset=True, exclude={"user_id"})
-        if not update_data:
-            raise HTTPException(status_code=400, detail="No data provided to update")
-            
-        data = supabase.update_user_profile(payload.user_id, update_data)
-        if not data:
-            raise HTTPException(status_code=400, detail="Failed to update profile")
-        return data
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+async def legacy_update_profile(
+    payload: Dict[str, Any],
+    mongodb_svc: MongoDBService = Depends(get_mongodb_service),
+) -> UserResponse:
+    user_id = payload.get("user_id") or payload.get("id")
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id is required")
+    updated = await mongodb_svc.update_user(user_id, payload)
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserResponse(**updated)
